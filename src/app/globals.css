@@ -1,45 +1,208 @@
-/* src/app/globals.css */
 @import "tailwindcss";
 
-/* ===== Theme tokens (Tailwind v4) ===== */
+/* =========================================================
+   Theme tokens (Tailwind v4)
+========================================================= */
 @theme {
   --sidebar-bg: #0f172a;
-  --sidebar-border: rgba(255,255,255,.05);
+  --sidebar-border: rgba(255, 255, 255, 0.05);
   --accent: #16f2b3;
-  --surface: #f8fafc;  /* page bg */
+  --surface: #f8fafc;
   --border: #e2e8f0;
   --card: #ffffff;
-  --shadow-card: 0 2px 8px rgba(15,23,42,.1);
+  --shadow-card: 0 2px 8px rgba(15, 23, 42, 0.1);
 }
 
-/* Base */
-body { @apply bg-[var(--surface)] text-slate-800 antialiased; }
-
-/* Helpers */
-.card  { @apply rounded-xl bg-[var(--card)] border border-[var(--border)] shadow-[var(--shadow-card)]; }
-.badge { @apply inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-white px-2 py-1 text-xs text-slate-600; }
-.input { @apply w-full rounded-md border border-[var(--border)] bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-400/40; }
-
-
-/* ซ่อน scrollbar แต่ยังเลื่อนได้ */
-.no-scrollbar::-webkit-scrollbar {
-  width: 0;
-  height: 0;
+/* =========================================================
+   Base (VSCode-like dark)
+========================================================= */
+html,
+body {
+  @apply bg-[#0D1117] text-[#F0EEE9] antialiased;
+  scrollbar-width: thin;
+  scrollbar-color: #4b5563 #020617;
 }
 
-.no-scrollbar {
-  -ms-overflow-style: none; /* สำหรับ IE/Edge */
-  scrollbar-width: none; /* สำหรับ Firefox */
-  overscroll-behavior: contain; /* กันการเด้งเวลา scroll ถึงขอบ */
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+html::-webkit-scrollbar-track,
+body::-webkit-scrollbar-track {
+  background: #020617;
+}
+html::-webkit-scrollbar-thumb,
+body::-webkit-scrollbar-thumb {
+  background-color: #4b5563;
+  border-radius: 999px;
+  border: 2px solid #020617;
+}
+html::-webkit-scrollbar-thumb:hover,
+body::-webkit-scrollbar-thumb:hover {
+  background-color: #9ca3af;
 }
 
-
-.no-scrollbar::-webkit-scrollbar {
-  width: 0;
-  height: 0;
+/* =========================================================
+   Helpers
+========================================================= */
+.card {
+  @apply rounded-xl bg-[var(--card)] border border-[var(--border)] shadow-[var(--shadow-card)];
 }
+.badge {
+  @apply inline-flex items-center gap-1 rounded-md border border-[var(--border)]
+         bg-white px-2 py-1 text-xs text-slate-600;
+}
+.input {
+  @apply w-full rounded-md border border-[var(--border)]
+         bg-white px-3 py-2 text-sm outline-none
+         focus:ring-2 focus:ring-emerald-400/40;
+}
+
+/* =========================================================
+   Scrollbar utils
+========================================================= */
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
-  overscroll-behavior: contain;
+}
+.no-scrollbar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+/* Node palette scrollbar */
+.node-palette-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #4b5563 #020617;
+}
+.node-palette-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.node-palette-scroll::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.9);
+  border-radius: 999px;
+}
+.node-palette-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(to bottom, #4b5563, #64748b);
+  border-radius: 999px;
+}
+.node-palette-scroll::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(to bottom, #6366f1, #4f46e5);
+}
+
+/* =========================================================
+   Animations
+========================================================= */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fadeIn {
+  animation: fadeIn 0.15s ease-out;
+}
+
+/* =========================================================
+   React Flow – Controls (VSCode style, FIX ICON)
+========================================================= */
+
+/* container */
+.react-flow__controls {
+  background: rgba(2, 6, 23, 0.92) !important;
+  border: 1px solid rgba(51, 65, 85, 0.75) !important;
+  border-radius: 9999px !important;
+  padding: 6px !important;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.7) !important;
+}
+
+/* button */
+.react-flow__controls-button {
+  background: rgba(2, 6, 23, 0.98) !important;
+  border: 0 !important;
+  border-bottom: 1px solid rgba(51, 65, 85, 0.75) !important;
+  /* ✅ สีไอคอนตามธีม */
+  color: #F0EEE9 !important;
+}
+
+.react-flow__controls-button:last-child {
+  border-bottom: none !important;
+}
+.react-flow__controls-button:hover {
+  background: rgba(15, 23, 42, 0.95) !important;
+  color: #ffffff !important; /* hover ขาวขึ้นนิด */
+}
+
+/* =========================================================
+   ✅ ICON RENDERING (สำคัญมาก)
+   - path  → fill
+   - line  → stroke
+   - rect  → stroke
+========================================================= */
+
+/* filled icons (+, -, lock) */
+.react-flow__controls-button svg path {
+  fill: currentColor !important;
+  stroke: none !important;
+}
+
+/* line-based icons */
+.react-flow__controls-button svg line,
+.react-flow__controls-button svg polyline {
+  stroke: currentColor !important;
+  fill: none !important;
+  stroke-width: 1.6 !important;
+  stroke-linecap: round !important;
+  stroke-linejoin: round !important;
+}
+
+/* rect (fit-view icon) */
+.react-flow__controls-button svg rect {
+  fill: none !important;
+  stroke: currentColor !important;
+  stroke-width: 1.6 !important;
+  rx: 2px;
+}
+
+/* prevent zoom distortion */
+.react-flow__controls-button svg * {
+  vector-effect: non-scaling-stroke;
+}
+
+/* =========================================================
+   React Flow – Misc
+========================================================= */
+
+/* hide attribution */
+.react-flow__attribution {
+  display: none !important;
+}
+
+/* edge hover */
+.etl-edge path {
+  stroke-linecap: round;
+}
+.etl-edge:hover path {
+  filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.35));
+}
+
+/* edge labels */
+.react-flow__edge-labels {
+  pointer-events: none;
+}
+.react-flow__edge-label {
+  pointer-events: all;
+}
+
+/* MiniMap viewport */
+.react-flow__minimap-viewport {
+  fill: rgba(56, 189, 248, 0.28);
+  stroke: rgba(224, 242, 254, 1);
+  stroke-width: 2.5;
+  rx: 6px;
 }

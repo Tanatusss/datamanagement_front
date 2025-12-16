@@ -1,34 +1,40 @@
+// src/app/layout.tsx
 import "./globals.css";
 import type { Metadata } from "next";
-import Sidebar from "@/components/Sidebar";
-import Topbar from "@/components/TopNav";
-import { Inter, Prompt } from "next/font/google";
+import { Sarabun } from "next/font/google";
+import AppShell from "@/components/AppShell";
+import ToastProvider from "@/components/ToastProvider";
+import { AuthProvider } from "@/context/AuthContext";
+import { SpaceProvider } from "@/components/ingestion/SpaceContext";
+import { ConnectionProvider } from "@/components/ingestion/ConnectionsContext";
 
 export const metadata: Metadata = {
   title: "BOL Data Management Platform ​",
   description: "Interactive data workspace",
 };
-const inter = Inter({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-});
 
-const prompt = Prompt({
+const sarabun = Sarabun({
   subsets: ["latin", "thai"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["300", "400", "500", "600", "700"],
+  display: "swap",
 });
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <html lang="th" className={`${inter.className} ${prompt.className}`}>
-      <body className="bg-slate-50 text-slate-900">
-        <Sidebar />
-        <Topbar userEmail="Introvert007w@product.com" />
-
-        {/* เว้นระยะเพื่อไม่ให้เนื้อหาทับ navbar/sidebar */}
-        <main className="ml-[240px] mt-[56px] p-6 min-h-screen">
-          {children}
-        </main>
+    <html lang="th" className={sarabun.className}>
+      <body className="min-h-screen bg-[#0D1117]">
+        <ToastProvider />
+        <AuthProvider>
+          <SpaceProvider>
+            <ConnectionProvider>
+              <AppShell>{children}</AppShell>
+            </ConnectionProvider>
+          </SpaceProvider>
+        </AuthProvider>
       </body>
     </html>
   );
