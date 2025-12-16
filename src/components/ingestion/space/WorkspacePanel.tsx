@@ -1,22 +1,24 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import {
-  CheckCircle2,
-  Copy,
-  FileJson,
-  FileText,
-  AlertTriangle,
-} from "lucide-react";
-
-// ✅ ใช้ panel ที่ทำ line-number sync เรียบร้อยแล้ว
+import { CheckCircle2, Copy, FileJson, FileText, AlertTriangle } from "lucide-react";
 import JsonSchemaPanel from "./transform/JsonSchemaPanel";
+import { WorkspaceNode } from "@/components/ingestion/space/WorkspaceNode";
 
 type WorkspaceMode = "transform" | "sql";
+
+export type NodeSpec = {
+  kind: "dataset" | "field" | "source" | "sql_draft";
+  label: string;
+  payload?: any;
+};
 
 type Props = {
   mode: WorkspaceMode;
   compact?: boolean;
+
+  /** ✅ กดปุ่มแล้วส่ง node specs ออกไปให้ FlowCanvas ไปสร้าง node จริง */
+  onGenerateNodes?: (nodes: NodeSpec[], meta: { mode: WorkspaceMode; raw: string }) => void;
 };
 
 const TRANSFORM_TEMPLATE = JSON.stringify(
@@ -40,7 +42,7 @@ const TRANSFORM_TEMPLATE = JSON.stringify(
 );
 
 const SQL_TEMPLATE = `-- SQL Workspace (Reference / Draft)
--- วาง query หรือ schema เพื่อใช้เป็น reference หรือเตรียมสร้าง dataset
+-- วาง query หรือ schema เพื่อใช้เป็น reference หรือเตรียมสร้าง node
 
 SELECT
   customer_id,
@@ -59,7 +61,53 @@ function safeJsonParse(text: string):
   }
 }
 
-export function WorkspacePanel({ mode, compact = false }: Props) {
+function buildNodesFromTransformJson(parsed: any): NodeSpec[] {
+  const schema = parsed?.schema ?? {};
+  const dataset = schema?.dataset;
+  const fields = Array.isArray(schema?.fields) ? schema.fields : [];
+  const sources = Array.isArray(parsed?.example_nodes) ? parsed.example_nodes : [];
+
+  const out: NodeSpec[] = [];
+
+  if (dataset) {
+    out.push({
+      kind: "dataset",
+      label: String(dataset),
+      payload: { dataset: String(dataset) },
+    });
+  }
+
+  for (const f of fields) {
+    if (!f?.name) continue;
+    out.push({
+      kind: "field",
+      label: `${String(f.name)}${f.type ? ` : ${String(f.type)}` : ""}`,
+      payload: { name: f.name, type: f.type ?? null, dataset: dataset ?? null },
+    });
+  }
+
+  for (const s of sources) {
+    const label =
+      s?.connection && s?.table
+        ? `${String(s.connection)}.${String(s.table)}`
+        : s?.table
+        ? String(s.table)
+        : s?.connection
+        ? String(s.connection)
+        : null;
+
+    if (!label) continue;
+    out.push({
+      kind: "source",
+      label,
+      payload: { ...s },
+    });
+  }
+
+  return out;
+}
+
+export function WorkspacePanel({ mode, compact = false, onGenerateNodes }: Props) {
   const [drafts, setDrafts] = useState({
     transform: TRANSFORM_TEMPLATE,
     sql: SQL_TEMPLATE,
@@ -76,8 +124,8 @@ export function WorkspacePanel({ mode, compact = false }: Props) {
   const title = mode === "transform" ? "Transform Workspace" : "SQL Workspace";
   const subtitle =
     mode === "transform"
-      ? "วาง JSON / Schema เพื่อใช้เป็น reference หรือวาง draft สำหรับเตรียมสร้าง node"
-      : "วาง query / schema เพื่อใช้เป็น reference หรือเตรียมสร้าง node";
+      ? "วาง JSON / Schema แล้วกด Generate เพื่อสร้าง node"
+      : "วาง query แล้วกด Generate เพื่อสร้าง node";
 
   const languageHint = mode === "transform" ? "JSON / SCHEMA" : "SQL / SCHEMA";
 
@@ -99,8 +147,14 @@ export function WorkspacePanel({ mode, compact = false }: Props) {
     }
   };
 
-  const handleValidate = () => {
+  /** ✅ เปลี่ยน Validate/Save -> Generate Nodes */
+  const handleGenerate = () => {
     setStatus({ type: "idle" });
+
+    if (!onGenerateNodes) {
+      setStatus({ type: "error", msg: "Missing onGenerateNodes handler" });
+      return;
+    }
 
     if (mode === "transform") {
       const parsed = safeJsonParse(text);
@@ -108,15 +162,34 @@ export function WorkspacePanel({ mode, compact = false }: Props) {
         setStatus({ type: "error", msg: parsed.error });
         return;
       }
-      setStatus({ type: "ok", msg: "Valid JSON" });
+
+      const nodes = buildNodesFromTransformJson(parsed.value);
+      if (nodes.length === 0) {
+        setStatus({ type: "error", msg: "No node data found in JSON" });
+        return;
+      }
+
+      onGenerateNodes(nodes, { mode, raw: text });
+      setStatus({ type: "ok", msg: `Generated ${nodes.length} node(s)` });
       return;
     }
 
+    // sql
     if (!text.trim()) {
       setStatus({ type: "error", msg: "Empty SQL" });
       return;
     }
-    setStatus({ type: "ok", msg: "Saved as draft" });
+
+    const nodes: NodeSpec[] = [
+      {
+        kind: "sql_draft",
+        label: "SQL Draft",
+        payload: { sql: text },
+      },
+    ];
+
+    onGenerateNodes(nodes, { mode, raw: text });
+    setStatus({ type: "ok", msg: "Generated 1 node" });
   };
 
   const panelTitle = useMemo(() => languageHint, [languageHint]);
@@ -136,11 +209,11 @@ export function WorkspacePanel({ mode, compact = false }: Props) {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={handleValidate}
+            onClick={handleGenerate}
             className="inline-flex items-center gap-2 rounded-xl bg-slate-800/80 px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-slate-700"
           >
             <CheckCircle2 className="h-4 w-4" />
-            {mode === "transform" ? "Validate" : "Save"}
+            Generate
           </button>
 
           <button
@@ -154,7 +227,7 @@ export function WorkspacePanel({ mode, compact = false }: Props) {
         </div>
       </div>
 
-      {/* Status line (เหมือนของเดิม) */}
+      {/* Status line */}
       {status.type !== "idle" && (
         <div className="flex items-center justify-end">
           {status.type === "ok" ? (
@@ -168,13 +241,12 @@ export function WorkspacePanel({ mode, compact = false }: Props) {
         </div>
       )}
 
-      {/* ✅ Editor panel (ใช้ JsonSchemaPanel ที่ line-number sync แล้ว) */}
+      {/* Editor */}
       <JsonSchemaPanel
         title={panelTitle}
         value={text}
         onChange={(v) => setDrafts((prev) => ({ ...prev, [mode]: v }))}
         heightPx={heightPx}
-        // className ใส่เพิ่มให้ใกล้เคียงธีมเดิม
         className="border border-slate-700 bg-[#020617]/70"
       />
 
@@ -183,11 +255,10 @@ export function WorkspacePanel({ mode, compact = false }: Props) {
         <p className="font-semibold text-slate-200">Tips</p>
         <ul className="mt-2 list-disc space-y-1 pl-5">
           <li>
-            Workspace นี้เป็น{" "}
-            <span className="text-slate-200">reference / draft</span>
+            กด <span className="text-slate-200">Generate</span> เพื่อส่งข้อมูลไปสร้าง node ใน canvas
           </li>
-          <li>Transform: วาง JSON schema, mapping plan</li>
-          <li>SQL: วาง query draft หรือ notes</li>
+          <li>Transform: ใช้ schema.dataset / schema.fields / example_nodes</li>
+          <li>SQL: สร้าง node เดียวเป็น SQL Draft</li>
         </ul>
       </div>
     </div>

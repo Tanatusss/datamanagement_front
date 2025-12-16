@@ -20,7 +20,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Plus,
-  Database,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
@@ -207,7 +206,6 @@ export default function SidebarVer2({
             type="button"
             onClick={() => {
               router.push("/");
-              // ถ้า sidebar ย่อยยังเปิดอยู่ ให้ปิดด้วย
               if (!collapsed) onToggleSidebar();
             }}
             className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#020617] text-xs font-bold text-[#F0EEE9] shadow-sm hover:bg-[#111827]"
@@ -333,7 +331,9 @@ export default function SidebarVer2({
               className={[
                 "absolute left-0 h-6 w-[3px] rounded-r-full bg-sky-500",
                 "transition-opacity duration-150",
-                activeSection === "admin" ? "opacity-100" : "opacity-0 group-hover:opacity-70",
+                activeSection === "admin"
+                  ? "opacity-100"
+                  : "opacity-0 group-hover:opacity-70",
               ].join(" ")}
             />
             <Settings
@@ -352,35 +352,41 @@ export default function SidebarVer2({
       {/* Submenu pane (ขวาของ activity bar) */}
       <aside
         className={[
-          "relative h-full bg-[#050812] transition-all duration-200",
-          collapsed ? "w-0 border-l border-[#12151e]" : "w-64 border-r border-[#12151e]",
+          // ✅ สำคัญ: ยกชั้นให้สูงกว่า main + รับคลิกแน่นอน
+          "relative z-40 pointer-events-auto h-full bg-[#050812] transition-all duration-200",
+          collapsed
+            ? "w-0 border-l border-[#12151e]"
+            : "w-64 border-r border-[#12151e]",
         ].join(" ")}
       >
         {!collapsed && (
-          <div className="relative h-full w-64">
-            {/* Submenu header */}
-            <div className="flex items-center justify-between border-b border-[#12151e] px-4 py-3">
-              <div className="flex flex-col">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#F0EEE9B3]">
-                  {activeSection ? "Section" : "Workspace"}
-                </span>
-                <span className="text-sm font-medium text-[#F0EEE9]">
-                  {currentSection?.label ?? "Home"}
-                </span>
+          <div className="relative flex h-full w-64 flex-col">
+            {/* Header */}
+            <div className="relative z-10 border-b border-[#12151e] px-4 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#F0EEE9B3]">
+                    {activeSection ? "Section" : "Workspace"}
+                  </span>
+                  <span className="mt-0.5 block truncate text-sm font-medium text-[#F0EEE9]">
+                    {currentSection?.label ?? "Home"}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={onToggleSidebar}
+                  className="flex h-7 w-7 items-center justify-center rounded-full bg-[#03050b] text-[#F0EEE9B3] hover:bg-[#020617] hover:text-[#F0EEE9]"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
               </div>
 
-              {/* ปุ่มปิด sidebar ย่อย */}
-              <button
-                type="button"
-                onClick={onToggleSidebar}
-                className="flex h-7 w-7 items-center justify-center rounded-full bg-[#03050b] text-[#F0EEE9B3] hover:bg-[#020617] hover:text-[#F0EEE9]"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
+              <div className="pointer-events-none mt-3 h-px w-full bg-gradient-to-r from-transparent via-slate-700/60 to-transparent" />
             </div>
 
-            {/* Submenu content */}
-            <nav className="flex-1 space-y-0.5 p-2 text-sm">
+            {/* Content */}
+            <nav className="relative z-10 flex-1 space-y-4 px-3 py-3 text-sm">
               {activeSection === "ingestion" ? (
                 <>
                   {/* Dashboard */}
@@ -388,135 +394,146 @@ export default function SidebarVer2({
                     type="button"
                     onClick={() => router.push("/ingestion/dashboard")}
                     className={[
-                      "flex w-full items-center justify-between rounded-md px-3 py-1.5",
+                      "flex w-full items-center justify-between rounded-lg px-3 py-2",
                       "transition-colors duration-150",
                       isActiveRoute("/ingestion/dashboard")
                         ? "bg-[#141824] text-[#F0EEE9]"
                         : "text-[#F0EEE9B3] hover:bg-[#141824] hover:text-[#F0EEE9]",
                     ].join(" ")}
                   >
-                    <span>Dashboard</span>
+                    <span className="text-[13px] font-medium">Dashboard</span>
+                    <ChevronRight className="h-4 w-4 text-slate-500" />
                   </button>
 
-                  {/* Spaces header */}
-                  <div className="mt-2 flex items-center justify-between px-1 text-xs text-[#F0EEE9B3]">
-                    <button
-                      type="button"
-                      onClick={() => router.push("/ingestion/space")}
-                      className={[
-                        "rounded-md px-1 py-0.5 uppercase tracking-wide",
-                        isActiveRoute("/ingestion/space")
-                          ? "bg-[#141824] text-[#F0EEE9]"
-                          : "hover:bg-[#141824] hover:text-[#F0EEE9]",
-                      ].join(" ")}
-                    >
-                      Spaces
-                    </button>
+                  {/* ===== Spaces block ===== */}
+                  <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3">
+                    <div className="flex items-center justify-between">
+                      {/* ✅ กดหัวข้อเพื่อไปหน้ารวม spaces */}
+                      <button
+                        type="button"
+                        onClick={() => router.push("/ingestion/space")}
+                        className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#F0EEE9B3] hover:text-[#F0EEE9]"
+                      >
+                        Spaces
+                      </button>
 
-                    <button
-                      type="button"
-                      onClick={() => setSpaceModalOpen(true)}
-                      className="flex h-6 w-6 items-center justify-center rounded-full bg-[#111827] text-[#F0EEE9] hover:bg-[#1f2937]"
-                      title="Create Space"
-                    >
-                      <Plus className="h-3 w-3" />
-                    </button>
-                  </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSpaceModalOpen(true);
+                        }}
+                        className="flex h-7 w-7 items-center justify-center rounded-full bg-white/5 text-[#F0EEE9B3] hover:bg-white/10 hover:text-[#F0EEE9] transition"
+                        title="Create Space"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </button>
+                    </div>
 
-                  {/* Space list */}
-                  {spaces.length > 0 ? (
-                    <div className="mt-1 space-y-0.5">
-                      {spaces.map((s) => (
-                        <button
-                          key={s.id}
-                          type="button"
-                          onClick={() => openSpaceDetail(s.id)}
-                          className={[
-                            "w-full rounded-md px-3 py-1.5 text-left text-sm",
-                            "transition-colors duration-150",
-                            pathname?.startsWith("/ingestion/space") &&
+                    <div className="mt-2 space-y-1">
+                      {spaces.length > 0 ? (
+                        spaces.map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => openSpaceDetail(s.id)} // ✅ logic เดิม
+                            className={[
+                              "w-full rounded-lg px-3 py-2 text-left",
+                              "transition-colors duration-150",
+                              pathname?.startsWith("/ingestion/space") &&
                               pathname.includes(encodeURIComponent(s.name))
-                              ? "bg-[#141824] text-[#F0EEE9]"
-                              : "text-[#F0EEE9B3] hover:bg-[#141824] hover:text-[#F0EEE9]",
-                          ].join(" ")}
-                        >
-                          • {s.name}
-                        </button>
-                      ))}
+                                ? "bg-[#141824] text-[#F0EEE9]"
+                                : "text-[#F0EEE9B3] hover:bg-[#141824] hover:text-[#F0EEE9]",
+                            ].join(" ")}
+                          >
+                            <span className="block truncate text-[13px] font-medium">
+                              • {s.name}
+                            </span>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="rounded-lg px-3 py-2 text-xs text-[#6b7280]">
+                          No spaces yet
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <p className="mt-1 px-3 text-xs text-[#6b7280]">
-                      No spaces yet
-                    </p>
-                  )}
-
-                  {/* Connections header */}
-                  <div className="mt-4 flex items-center justify-between px-1 text-xs text-[#F0EEE9B3]">
-                    <button
-                      type="button"
-                      onClick={() => router.push("/ingestion/connection")}
-                      className={[
-                        "rounded-md px-1 py-0.5 uppercase tracking-wide",
-                        isActiveRoute("/ingestion/connection")
-                          ? "bg-[#141824] text-[#F0EEE9]"
-                          : "hover:bg-[#141824] hover:text-[#F0EEE9]",
-                      ].join(" ")}
-                    >
-                      Connections
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={openConnectionCreateModal}
-                      className="flex h-6 w-6 items-center justify-center rounded-full bg-[#111827] text-[#F0EEE9] hover:bg-[#1f2937]"
-                      title="Create Connection"
-                    >
-                      <Plus className="h-3 w-3" />
-                    </button>
                   </div>
 
-                  {/* Connection list */}
-                  {connections.length > 0 ? (
-                    <div className="mt-1 space-y-0.5">
-                      {connections.map((c) => (
-                        <button
-                          key={c.id}
-                          type="button"
-                          onClick={() => openConnectionDetail(c.id)}
-                          className={[
-                            "w-full rounded-md px-3 py-1.5 text-left text-sm",
-                            "transition-colors duration-150",
-                            pathname?.startsWith("/ingestion/connection") &&
-                              pathname.includes(encodeURIComponent(c.id))
-                              ? "bg-[#141824] text-[#F0EEE9]"
-                              : "text-[#F0EEE9B3] hover:bg-[#141824] hover:text-[#F0EEE9]",
-                          ].join(" ")}
-                        >
-                          • {c.name}
-                        </button>
-                      ))}
+                  {/* ===== Connections block ===== */}
+                  <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3">
+                    <div className="flex items-center justify-between">
+                      {/* ✅ กดหัวข้อเพื่อไปหน้ารวม connections */}
+                      <button
+                        type="button"
+                        onClick={() => router.push("/ingestion/connection")}
+                        className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#F0EEE9B3] hover:text-[#F0EEE9]"
+                      >
+                        Connections
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openConnectionCreateModal(); // ✅ logic เดิม
+                        }}
+                        className="flex h-7 w-7 items-center justify-center rounded-full bg-white/5 text-[#F0EEE9B3] hover:bg-white/10 hover:text-[#F0EEE9] transition"
+                        title="Create Connection"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </button>
                     </div>
-                  ) : (
-                    <p className="mt-1 px-3 text-xs text-[#6b7280]">
-                      No connections yet
-                    </p>
-                  )}
+
+                    <div className="mt-2 space-y-1">
+                      {connections.length > 0 ? (
+                        connections.map((c) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => openConnectionDetail(c.id)} // ✅ logic เดิม
+                            className={[
+                              "w-full rounded-lg px-3 py-2 text-left",
+                              "transition-colors duration-150",
+                              pathname?.startsWith("/ingestion/connection") &&
+                              pathname.includes(encodeURIComponent(c.id))
+                                ? "bg-[#141824] text-[#F0EEE9]"
+                                : "text-[#F0EEE9B3] hover:bg-[#141824] hover:text-[#F0EEE9]",
+                            ].join(" ")}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="truncate text-[13px] font-medium">
+                                • {c.name}
+                              </span>
+                              <ChevronRight className="h-4 w-4 text-slate-500" />
+                            </div>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="rounded-lg px-3 py-2 text-xs text-[#6b7280]">
+                          No connections yet
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </>
               ) : activeSection ? (
-                <>
+                <div className="space-y-1">
                   {currentItems.map((item) => (
                     <Link
                       key={item.href}
                       href={item.href}
                       className={[
-                        "flex items-center rounded-md px-3 py-1.5",
+                        "flex items-center justify-between rounded-lg px-3 py-2",
                         "transition-colors duration-150",
                         isActiveRoute(item.href)
                           ? "bg-[#141824] text-[#F0EEE9]"
                           : "text-[#F0EEE9B3] hover:bg-[#141824] hover:text-[#F0EEE9]",
                       ].join(" ")}
                     >
-                      <span className="truncate">{item.label}</span>
+                      <span className="truncate text-[13px] font-medium">
+                        {item.label}
+                      </span>
+                      <ChevronRight className="h-4 w-4 text-slate-500" />
                     </Link>
                   ))}
 
@@ -525,13 +542,16 @@ export default function SidebarVer2({
                       No submenu
                     </div>
                   )}
-                </>
+                </div>
               ) : (
                 <div className="mt-4 px-3 text-xs text-[#6b7280]">
                   เลือกเมนูด้านซ้าย (OCR, Ingestion, ฯลฯ) เพื่อดูรายละเอียด
                 </div>
               )}
             </nav>
+
+            {/* ✅ bottom fade ไม่บังคลิก */}
+            <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-[#050812] to-transparent" />
           </div>
         )}
       </aside>
@@ -548,28 +568,16 @@ export default function SidebarVer2({
         </button>
       )}
 
-      {/* ✅ MAIN: header (Topbar) + content scroll + footer (BottomPanel) */}
-      <main className="flex min-h-0 flex-1 flex-col bg-[#0D1117] text-[#F0EEE9]">
-        {/* ===== TOPBAR (ไม่ scroll) ===== */}
-        {header && (
-          <div className="shrink-0 border-b border-slate-800">
-            {header}
+      {/* ✅ MAIN: ให้ z ต่ำกว่า sidebar */}
+      <main className="relative z-0 flex min-h-0 flex-1 flex-col bg-[#0D1117] text-[#F0EEE9]">
+        {header && <div className="shrink-0 border-b border-slate-800">{header}</div>}
+        <div className="min-h-0 flex-1 overflow-auto">{children}</div>
+        {footer && (
+          <div className="shrink-0 border-t border-slate-800 bg-[#050812]">
+            {footer}
           </div>
         )}
-
-        {/* ===== CONTENT (scroll เฉพาะตรงนี้) ===== */}
-        <div className="min-h-0 flex-1 overflow-auto">
-          {children}
-        </div>
-
-        {/* ===== BOTTOM BAR (ติดล่าง + ชิด sidebar ย่อย) ===== */}
-        {footer && (
-  <div className="shrink-0 border-t border-slate-800 bg-[#050812]">
-    {footer}
-  </div>
-)}
       </main>
-
 
       {/* Create Space modal */}
       <CreateSpaceModal

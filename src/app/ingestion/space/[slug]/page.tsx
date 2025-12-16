@@ -1,19 +1,16 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useSpaces } from "@/components/ingestion/SpaceContext";
 import { useConnections } from "@/components/ingestion/ConnectionsContext";
 
-import type {
-  LeftPanel,
-  NodeTemplate,
-} from "@/components/ingestion/space/space-detail/flowTypes";
+import type { LeftPanel, NodeTemplate } from "@/components/ingestion/space/space-detail/flowTypes";
 
 import { SpaceDetailHeader } from "@/components/ingestion/space/space-detail/SpaceDetailHeader";
 import { SpaceDetailLayout } from "@/components/ingestion/space/space-detail/SpaceDetailLayout";
 import { LeftWorkspacePanel } from "@/components/ingestion/space/space-detail/LeftWorkspacePanel";
-import { FlowCanvas } from "@/components/ingestion/space/space-detail/FlowCanvas";
+import { FlowCanvas, type NodeSpec } from "@/components/ingestion/space/space-detail/FlowCanvas";
 
 export default function SpaceDetailPage() {
   const router = useRouter();
@@ -29,6 +26,11 @@ export default function SpaceDetailPage() {
   const [leftPanel, setLeftPanel] = useState<LeftPanel>("none");
   const [templates, setTemplates] = useState<NodeTemplate[]>([]);
 
+  // ✅ เก็บ handler ที่ FlowCanvas provide มา
+  const genRef = useRef<
+    null | ((nodes: NodeSpec[], meta?: { mode?: "transform" | "sql"; raw?: string }) => void)
+  >(null);
+
   // sync ?left=transform|sql
   useEffect(() => {
     const left = (searchParams.get("left") as LeftPanel | null) ?? null;
@@ -41,18 +43,29 @@ export default function SpaceDetailPage() {
     setLeftPanel(p);
   };
 
-  const closeLeftPanel = () => {
+  const closeLeftPanel = useCallback(() => {
     router.push(`/ingestion/space/${encodeURIComponent(slug)}`);
     setLeftPanel("none");
-  };
+  }, [router, slug]);
 
-  const resolveConnectionById = (id: string) =>
-    connections.find((c) => c.id === id);
+  const resolveConnectionById = useCallback(
+    (id: string) => connections.find((c) => c.id === id),
+    [connections]
+  );
 
-  const resolveConnectionName = (id: string) =>
-    resolveConnectionById(id)?.name || "Unknown connection";
+  const resolveConnectionName = useCallback(
+    (id: string) => resolveConnectionById(id)?.name || "Unknown connection",
+    [resolveConnectionById]
+  );
 
-  // ✅ hook ต้องถูกเรียกเสมอ (แม้ space ยังไม่มา)
+  // ✅ handler ที่ส่งให้ LeftWorkspacePanel เรียกตอนกด Generate
+  const handleGenerateFromWorkspace = useCallback(
+    (nodes: NodeSpec[], meta: { mode: "transform" | "sql"; raw: string }) => {
+      genRef.current?.(nodes, meta);
+    },
+    []
+  );
+
   const right = useMemo(() => {
     if (!space) return null;
 
@@ -64,23 +77,25 @@ export default function SpaceDetailPage() {
         resolveConnectionName={resolveConnectionName}
         templates={templates}
         setTemplates={setTemplates}
+        onProvideGenerateHandler={(fn) => {
+          genRef.current = fn;
+        }}
       />
     );
-  }, [
-    space,
-    slug,
-    connections,
-    templates,
-    resolveConnectionById,
-    resolveConnectionName,
-  ]);
+  }, [space, slug, connections, templates, resolveConnectionById, resolveConnectionName]);
 
   const left = useMemo(() => {
     if (leftPanel === "none") return null;
-    return <LeftWorkspacePanel leftPanel={leftPanel} onClose={closeLeftPanel} />;
-  }, [leftPanel]);
 
-  // ⬇️ ค่อยตัดสินใจ render ตรงนี้
+    return (
+      <LeftWorkspacePanel
+        leftPanel={leftPanel}
+        onClose={closeLeftPanel}
+        onGenerateNodes={handleGenerateFromWorkspace}
+      />
+    );
+  }, [leftPanel, closeLeftPanel, handleGenerateFromWorkspace]);
+
   if (!space) {
     return (
       <div className="space-y-4">
@@ -90,9 +105,7 @@ export default function SpaceDetailPage() {
         >
           ← Back to Spaces
         </button>
-        <p className="text-sm text-rose-400">
-          Space &quot;{slug}&quot; not found.
-        </p>
+        <p className="text-sm text-rose-400">Space &quot;{slug}&quot; not found.</p>
       </div>
     );
   }
@@ -107,11 +120,7 @@ export default function SpaceDetailPage() {
         onOpenSql={() => openLeftPanel("sql")}
       />
 
-      <SpaceDetailLayout
-        leftPanel={leftPanel}
-        left={left}
-        right={right}
-      />
+      <SpaceDetailLayout leftPanel={leftPanel} left={left} right={right} />
     </div>
   );
 }

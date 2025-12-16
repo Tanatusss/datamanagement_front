@@ -116,16 +116,16 @@ type ColumnId = (typeof COLUMNS)[number]["id"];
 
 type SortConfig =
   | {
-    columnId: ColumnId;
-    direction: "asc" | "desc";
-  }
+      columnId: ColumnId;
+      direction: "asc" | "desc";
+    }
   | null;
 
 type FilterConfig =
   | {
-    columnId: ColumnId;
-    value: string;
-  }
+      columnId: ColumnId;
+      value: string;
+    }
   | null;
 
 function safeDecode(v: string) {
@@ -172,7 +172,6 @@ export default function NodeDetailPage() {
 
   const [rows, setRows] = useState<Row[]>(INITIAL_ROWS);
   const [loadingRows, setLoadingRows] = useState(true);
-  const [rowsInfo, setRowsInfo] = useState<string | null>(null);
   const connectionIdFromQuery = searchParams.get("connectionId") || "";
 
   type PayloadMeta = {
@@ -187,7 +186,6 @@ export default function NodeDetailPage() {
   useEffect(() => {
     let alive = true;
     setLoadingRows(true);
-    setRowsInfo(null);
     setPayloadMeta(null);
 
     const key = `nodePreview:${slug}:${nodeId}`;
@@ -200,8 +198,12 @@ export default function NodeDetailPage() {
 
         // keep meta (ไว้ใช้ resolve connection)
         const meta: PayloadMeta = {
-          connectionId: payload?.connectionId ? String(payload.connectionId) : undefined,
-          connectionName: payload?.connectionName ? String(payload.connectionName) : undefined,
+          connectionId: payload?.connectionId
+            ? String(payload.connectionId)
+            : undefined,
+          connectionName: payload?.connectionName
+            ? String(payload.connectionName)
+            : undefined,
           table: payload?.table ? String(payload.table) : undefined,
         };
         setPayloadMeta(meta);
@@ -229,14 +231,8 @@ export default function NodeDetailPage() {
               : mapped;
 
           setRows(merged);
-          setRowsInfo(
-            mapped.length < INITIAL_ROWS.length
-              ? `Loaded ${mapped.length} rows from Flow + filled mock to ${merged.length}`
-              : `Loaded ${mapped.length} rows from Flow`
-          );
         } else {
           setRows(INITIAL_ROWS);
-          setRowsInfo("No rows in payload → fallback mock");
         }
 
         setLoadingRows(false);
@@ -249,7 +245,6 @@ export default function NodeDetailPage() {
     // fallback if no payload
     if (alive) {
       setRows(INITIAL_ROWS);
-      // setRowsInfo("No payload found → fallback mock");
       setLoadingRows(false);
     }
 
@@ -258,25 +253,23 @@ export default function NodeDetailPage() {
     };
   }, [slug, nodeId]);
 
-
   // ✅ 2) resolve dbType/dbIcon from ConnectionsContext by connectionName
   const rawConnection = useMemo(() => {
-  if (connectionIdFromQuery) {
-    const byId = connections.find((c: any) => String(c.id) === String(connectionIdFromQuery));
-    if (byId) return byId;
-  }
-  return connections.find((c: any) => c.name === connectionName);
-}, [connections, connectionIdFromQuery, connectionName]);
-
-
+    if (connectionIdFromQuery) {
+      const byId = connections.find(
+        (c: any) => String(c.id) === String(connectionIdFromQuery)
+      );
+      if (byId) return byId;
+    }
+    return connections.find((c: any) => c.name === connectionName);
+  }, [connections, connectionIdFromQuery, connectionName]);
 
   const dbType: DbType | undefined = rawConnection?.type as DbType | undefined;
 
   // IMPORTANT: use <img> and ensure basePath
   const dbIcon: string | undefined = dbType
-  ? getDbIconForType(dbType)  // ✅ เหมือนหน้า create node
-  : undefined;
-
+    ? getDbIconForType(dbType) // ✅ เหมือนหน้า create node
+    : undefined;
 
   const [activeTab, setActiveTab] = useState<TabKey>("summary");
   const [openMenuCol, setOpenMenuCol] = useState<ColumnId | null>(null);
@@ -285,7 +278,9 @@ export default function NodeDetailPage() {
   const [editingCol, setEditingCol] = useState<ColumnId | null>(null);
   const [sortConfig, setSortConfig] = useState<SortConfig>(null);
   const [filterConfig, setFilterConfig] = useState<FilterConfig>(null);
-  const [pendingFilterCol, setPendingFilterCol] = useState<ColumnId | null>(null);
+  const [pendingFilterCol, setPendingFilterCol] = useState<ColumnId | null>(
+    null
+  );
   const [filterValueInput, setFilterValueInput] = useState("");
 
   const handleHeaderClick = (colId: ColumnId) => {
@@ -307,14 +302,18 @@ export default function NodeDetailPage() {
 
     if (action === "filter") {
       setPendingFilterCol(colId);
-      setFilterValueInput(filterConfig?.columnId === colId ? filterConfig.value : "");
+      setFilterValueInput(
+        filterConfig?.columnId === colId ? filterConfig.value : ""
+      );
       return;
     }
 
     if (action === "sort") {
       setSortConfig((prev) => {
-        if (!prev || prev.columnId !== colId) return { columnId: colId, direction: "asc" };
-        if (prev.direction === "asc") return { columnId: colId, direction: "desc" };
+        if (!prev || prev.columnId !== colId)
+          return { columnId: colId, direction: "asc" };
+        if (prev.direction === "asc")
+          return { columnId: colId, direction: "desc" };
         return null;
       });
       return;
@@ -342,7 +341,9 @@ export default function NodeDetailPage() {
       const { columnId, value } = filterConfig;
       const lower = value.toLowerCase();
       data = data.filter((row) =>
-        String((row as any)[columnId] ?? "").toLowerCase().includes(lower)
+        String((row as any)[columnId] ?? "")
+          .toLowerCase()
+          .includes(lower)
       );
     }
 
@@ -440,7 +441,11 @@ export default function NodeDetailPage() {
           <div className="flex items-center gap-2">
             {(["summary", "explore", "chart"] as TabKey[]).map((key) => {
               const label =
-                key === "summary" ? "Summary" : key === "explore" ? "Explore" : "Chart";
+                key === "summary"
+                  ? "Summary"
+                  : key === "explore"
+                  ? "Explore"
+                  : "Chart";
               const isActive = activeTab === key;
 
               return (
@@ -465,15 +470,17 @@ export default function NodeDetailPage() {
             <div className="bg-slate-900 px-4 py-2 text-[11px] font-medium text-slate-300 border-b border-slate-700 flex items-center justify-between">
               <span>{table}</span>
               <div className="flex items-center gap-2">
-                {loadingRows && <span className="text-[11px] text-slate-400">Loading...</span>}
-                {!loadingRows && rowsInfo && <span className="text-[11px] text-slate-400">{rowsInfo}</span>}
+                {loadingRows && (
+                  <span className="text-[11px] text-slate-400">Loading...</span>
+                )}
               </div>
             </div>
 
             {pendingFilterCol && (
               <div className="flex items-center gap-2 border-b border-slate-700 bg-slate-900 px-3 py-2 text-[11px] text-slate-200">
                 <span className="font-medium">
-                  Filter on {COLUMNS.find((c) => c.id === pendingFilterCol)?.label}:
+                  Filter on{" "}
+                  {COLUMNS.find((c) => c.id === pendingFilterCol)?.label}:
                 </span>
 
                 {pendingFilterCol === "category" ? (
@@ -524,8 +531,9 @@ export default function NodeDetailPage() {
                         <button
                           type="button"
                           onClick={() => handleHeaderClick(col.id)}
-                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-md hover:bg-slate-800 ${openMenuCol === col.id ? "bg-slate-800" : ""
-                            }`}
+                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-md hover:bg-slate-800 ${
+                            openMenuCol === col.id ? "bg-slate-800" : ""
+                          }`}
                         >
                           <span className="font-mono text-[11px]">
                             {col.label}
@@ -550,7 +558,9 @@ export default function NodeDetailPage() {
                               onClick={() => handleMenuSelect("edit-column", col.id)}
                               className="block w-full px-3 py-1 text-left hover:bg-slate-800"
                             >
-                              {editingCol === col.id ? "Stop editing" : "Edit column"}
+                              {editingCol === col.id
+                                ? "Stop editing"
+                                : "Edit column"}
                             </button>
                             <button
                               type="button"
@@ -593,7 +603,9 @@ export default function NodeDetailPage() {
                                   const value = e.target.value;
                                   setRows((prev) =>
                                     prev.map((r) =>
-                                      r.id === row.id ? { ...r, [col.id]: value } : r
+                                      r.id === row.id
+                                        ? { ...r, [col.id]: value }
+                                        : r
                                     )
                                   );
                                 }}
@@ -609,7 +621,10 @@ export default function NodeDetailPage() {
 
                   {!processedRows.length && !loadingRows && (
                     <tr>
-                      <td colSpan={COLUMNS.length} className="px-4 py-10 text-center text-sm text-slate-400">
+                      <td
+                        colSpan={COLUMNS.length}
+                        className="px-4 py-10 text-center text-sm text-slate-400"
+                      >
                         No rows
                       </td>
                     </tr>
@@ -622,7 +637,8 @@ export default function NodeDetailPage() {
           <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
             {editingChipLabel && (
               <span className="inline-flex items-center gap-1 rounded-full bg-slate-800 px-2 py-0.5 text-[10px] text-slate-100">
-                Editing column: <span className="font-mono">{editingChipLabel}</span>
+                Editing column:{" "}
+                <span className="font-mono">{editingChipLabel}</span>
               </span>
             )}
 
@@ -632,7 +648,11 @@ export default function NodeDetailPage() {
                 <span className="font-mono">
                   {activeFilterLabel} ~ "{filterConfig.value}"
                 </span>
-                <button type="button" onClick={clearFilter} className="ml-1 text-[10px] underline">
+                <button
+                  type="button"
+                  onClick={clearFilter}
+                  className="ml-1 text-[10px] underline"
+                >
                   clear
                 </button>
               </span>
@@ -650,7 +670,12 @@ export default function NodeDetailPage() {
         </div>
       </div>
 
-      <AnalyzeModal open={!!analyzeCol} onClose={() => setAnalyzeCol(null)} column={analyzeCol} rows={rows} />
+      <AnalyzeModal
+        open={!!analyzeCol}
+        onClose={() => setAnalyzeCol(null)}
+        column={analyzeCol}
+        rows={rows}
+      />
     </div>
   );
 }

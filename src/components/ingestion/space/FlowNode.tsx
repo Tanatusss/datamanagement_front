@@ -11,7 +11,9 @@ import { Database, X as XIcon } from "lucide-react";
 import { DbType } from "../dbCatalog";
 
 export type FlowNodeData = {
-  connectionId?: string; // ✅ เพิ่ม
+  kind?: "dataset" | "field" | "source" | "sql_draft";
+  payload?: any;
+  connectionId?: string;
   connectionName: string;
   schema: string;
   table: string;

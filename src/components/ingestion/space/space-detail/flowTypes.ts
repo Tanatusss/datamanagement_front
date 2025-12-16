@@ -2,6 +2,7 @@
 import type { Edge, Node } from "@xyflow/react";
 import type { EtlActionType } from "@/components/ingestion/space/EtlActionIcon";
 import type { FlowNodeData } from "@/components/ingestion/space/FlowNode";
+import type { WorkspaceNodeData } from "@/components/ingestion/space/WorkspaceNode";
 
 export type NodeTemplate = {
   id: string;
@@ -26,7 +27,16 @@ export type EtlEdgeData = {
  * ไม่งั้น CurvedEdge / ReactFlow จะพัง
  */
 export type AppEdge = Edge<any>;
-export type AppNode = Node<FlowNodeData, "dbNode">;
+
+/**
+ * ✅ รองรับ node 2 แบบ:
+ * - dbNode          -> FlowNodeData (node ที่ลากจาก template)
+ * - workspaceNode   -> WorkspaceNodeData (node ที่ generate จาก Workspace JSON)
+ */
+export type AppNode = Node<
+  FlowNodeData | WorkspaceNodeData,
+  "dbNode" | "workspaceNode"
+>;
 
 export type LeftPanel = "none" | "transform" | "sql";
 export type PalettePanel = "node" | "etl";

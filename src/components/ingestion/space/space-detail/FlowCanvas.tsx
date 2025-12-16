@@ -1,7 +1,7 @@
 // src/components/ingestion/space/space-detail/FlowCanvas.tsx
 "use client";
 
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import {
   ReactFlow,
@@ -13,18 +13,25 @@ import {
   reconnectEdge,
   useNodesState,
   useEdgesState,
+  Position,
   type Connection,
   type NodeMouseHandler,
   type EdgeMouseHandler,
   type ReactFlowInstance,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-
+import { WorkspaceNode, WorkspaceNodeData } from "@/components/ingestion/space/WorkspaceNode";
 import { Database, ChevronRight, Plus, Wrench } from "lucide-react";
 
-import { FlowNode, type FlowNodeData } from "@/components/ingestion/space/FlowNode";
+import {
+  FlowNode,
+  type FlowNodeData,
+} from "@/components/ingestion/space/FlowNode";
 import { OrthogonalEdge } from "@/components/ingestion/space/OrthogonalEdge";
-import { TemplateModal, type ConnectionItem } from "@/components/ingestion/space/TemplateModal";
+import {
+  TemplateModal,
+  type ConnectionItem,
+} from "@/components/ingestion/space/TemplateModal";
 import { SchemaPreviewModal } from "@/components/ingestion/space/SchemaPreviewModal";
 import {
   EtlActionIcon,
@@ -33,8 +40,20 @@ import {
 } from "@/components/ingestion/space/EtlActionIcon";
 import { getDbIconForType, type DbType } from "@/components/ingestion/dbCatalog";
 
-import type { NodeTemplate, PalettePanel, AppEdge, AppNode } from "./flowTypes";
+import type {
+  NodeTemplate,
+  PalettePanel,
+  AppEdge,
+  AppNode,
+} from "./flowTypes";
 import { ETL_ACTIONS, ETL_GROUPS } from "./etlConfig";
+
+/** ✅ NodeSpec ที่ WorkspacePanel จะส่งมา */
+export type NodeSpec = {
+  kind: "dataset" | "field" | "source" | "sql_draft";
+  label: string;
+  payload?: any;
+};
 
 type Props = {
   slug: string;
@@ -45,9 +64,14 @@ type Props = {
 
   templates: NodeTemplate[];
   setTemplates: React.Dispatch<React.SetStateAction<NodeTemplate[]>>;
+
+  /** ✅ ให้ parent ขอ handler ไปใช้ (Workspace กด Generate -> ส่งมาที่นี่) */
+  onProvideGenerateHandler?: (
+    fn: (nodes: NodeSpec[], meta?: { mode?: "transform" | "sql"; raw?: string }) => void
+  ) => void;
 };
 
-const nodeTypes = { dbNode: FlowNode };
+const nodeTypes = { dbNode: FlowNode, workspaceNode: WorkspaceNode };
 const edgeTypes = { etlSmooth: OrthogonalEdge };
 
 export function FlowCanvas({
@@ -57,6 +81,7 @@ export function FlowCanvas({
   resolveConnectionById,
   templates,
   setTemplates,
+  onProvideGenerateHandler,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -114,6 +139,87 @@ export function FlowCanvas({
     },
     [setEdges]
   );
+
+  // ---------- ✅ Generate nodes from Workspace ----------
+const handleGenerateNodes = useCallback(
+  (specs: NodeSpec[], _meta?: { mode?: "transform" | "sql"; raw?: string }) => {
+    const COL_X: Record<NodeSpec["kind"], number> = {
+      dataset: 120,
+      field: 420,
+      source: 740,
+      sql_draft: 1020,
+    };
+
+    const baseY = 120 + Math.max(0, nodes.length) * 6;
+    const ROW_GAP = 86;
+
+    // helper: แยก schema/table จาก label (ถ้ามี "schema.table")
+    const splitSchemaTable = (label: string) => {
+      const trimmed = (label ?? "").trim();
+      const dotIdx = trimmed.indexOf(".");
+      if (dotIdx > 0) {
+        return {
+          schema: trimmed.slice(0, dotIdx),
+          table: trimmed.slice(dotIdx + 1),
+        };
+      }
+      return { schema: "", table: trimmed };
+    };
+
+    setNodes((prev) => {
+      const countByKind: Record<NodeSpec["kind"], number> = {
+        dataset: 0,
+        field: 0,
+        source: 0,
+        sql_draft: 0,
+      };
+
+      for (const n of prev as any[]) {
+        const k = (n?.data as any)?.kind as NodeSpec["kind"] | undefined;
+        if (k && k in countByKind) countByKind[k] += 1;
+      }
+
+      const created: AppNode[] = specs.map((s) => {
+        const idx = countByKind[s.kind];
+        countByKind[s.kind] += 1;
+
+        const id = crypto.randomUUID();
+        const { schema: sSchema, table: sTable } = splitSchemaTable(s.label);
+
+        const data: WorkspaceNodeData = {
+          label: sTable || s.label, // ใช้ label โชว์บน node
+          kind: s.kind,
+          payload: s.payload ?? null,
+          // ถ้าอยากโชว์ schema ด้วย ให้คอมเมนต์บรรทัดบน แล้วใช้บรรทัดนี้แทน:
+          // label: sSchema ? `${sSchema}.${sTable || s.label}` : (sTable || s.label),
+        };
+
+        return {
+          id,
+          type: "workspaceNode",
+          position: { x: COL_X[s.kind], y: baseY + idx * ROW_GAP },
+
+          // ✅ บังคับ handle ซ้าย/ขวา
+          targetPosition: Position.Left,
+          sourcePosition: Position.Right,
+
+          data,
+        } as AppNode;
+      });
+
+      return [...prev, ...created];
+    });
+  },
+  [nodes.length, setNodes]
+);
+
+
+
+  // ✅ expose generate handler to parent (SpaceDetailPage)
+  useEffect(() => {
+    if (!onProvideGenerateHandler) return;
+    onProvideGenerateHandler(handleGenerateNodes);
+  }, [onProvideGenerateHandler, handleGenerateNodes]);
 
   // ---------- Modal helpers ----------
   const resetModal = () => {
@@ -238,7 +344,6 @@ export function FlowCanvas({
             connectionName: d.connectionName,
             schema: d.schema,
             table: d.table,
-            // rows: [] // ยังไม่มี API ก็ปล่อยว่างได้ → NodeDetail จะ fallback mock
           })
         );
       } catch { }
@@ -248,14 +353,13 @@ export function FlowCanvas({
       qp.set("nodeId", node.id);
       qp.set("schema", d.schema || "public");
       qp.set("table", d.table || "");
-      if (d.connectionId) qp.set("connectionId", d.connectionId);     // ✅ เพิ่ม
-      if (d.connectionName) qp.set("connection", d.connectionName);   // ✅ เพิ่ม
+      if (d.connectionId) qp.set("connectionId", d.connectionId);
+      if (d.connectionName) qp.set("connection", d.connectionName);
 
       router.push(`${pathname}?${qp.toString()}`);
     },
     [router, pathname, searchParams, slug]
   );
-
 
   // (ถ้ายังอยากใช้ดับเบิ้ลคลิกด้วยก็ผูกให้เหมือนกัน)
   const onNodeDoubleClick: NodeMouseHandler<AppNode> = useCallback(
@@ -414,7 +518,6 @@ export function FlowCanvas({
                     connectionId: tmpl.connectionId,
                     connectionName,
                     table: tmpl.table,
-                    // rows: [] // ถ้ามี preview rows ค่อยใส่เพิ่ม
                   })
                 );
               } catch { }
@@ -427,7 +530,9 @@ export function FlowCanvas({
               qp.set("table", tmpl.table);
 
               router.push(
-                `/ingestion/space/${encodeURIComponent(slug)}/${encodeURIComponent(tmpl.schema)}?${qp.toString()}`
+                `/ingestion/space/${encodeURIComponent(slug)}/${encodeURIComponent(
+                  tmpl.schema
+                )}?${qp.toString()}`
               );
             },
 
@@ -440,8 +545,6 @@ export function FlowCanvas({
           },
         },
       ]);
-
-
     },
     [
       rfInstance,
@@ -451,6 +554,7 @@ export function FlowCanvas({
       findClosestEdgeId,
       slug,
       withEdgeCallbacks,
+      router,
     ]
   );
 
@@ -618,9 +722,7 @@ export function FlowCanvas({
                       {templates.map((t) => {
                         const conn = resolveConnectionById(t.connectionId);
                         const dbType = conn?.type as DbType | undefined;
-                        const dbIcon = dbType
-                          ? getDbIconForType(dbType)
-                          : undefined;
+                        const dbIcon = dbType ? getDbIconForType(dbType) : undefined;
 
                         return (
                           <div
