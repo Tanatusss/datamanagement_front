@@ -16,16 +16,18 @@ const TABS: { key: BottomTab; label: string }[] = [
   { key: "prompt", label: "PROMPT" },
 ];
 
-export default function BottomPanel({ open, onToggle }: Props) {
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n));
+}
+
+export default function BottomBar({ open, onToggle }: Props) {
   const [tab, setTab] = useState<BottomTab>("terminal");
 
-  // VSCode-like height
   const [height, setHeight] = useState<number>(260);
   const draggingRef = useRef(false);
   const startYRef = useRef(0);
   const startHRef = useRef(260);
 
-  // demo buffers (ต่อจริงทีหลังได้)
   const terminalLines = useMemo(
     () => [
       "✓ Compiled in 100ms",
@@ -41,44 +43,62 @@ export default function BottomPanel({ open, onToggle }: Props) {
     []
   );
 
-  // drag handle
-  const onMouseDownHandle = (e: React.MouseEvent) => {
+  const computeMaxH = () => {
+    if (typeof window === "undefined") return 520;
+    const vh = window.innerHeight || 800;
+    return clamp(Math.floor(vh * 0.55), 220, 560);
+  };
+
+  const onPointerDownHandle = (e: React.PointerEvent) => {
     draggingRef.current = true;
     startYRef.current = e.clientY;
     startHRef.current = height;
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
   };
 
   useEffect(() => {
-    const onMove = (e: MouseEvent) => {
+    const onMove = (e: PointerEvent) => {
       if (!draggingRef.current) return;
-      const dy = startYRef.current - e.clientY; // ดึงขึ้น = สูงขึ้น
-      const next = Math.min(520, Math.max(140, startHRef.current + dy));
-      setHeight(next);
+      const dy = startYRef.current - e.clientY;
+      const next = startHRef.current + dy;
+
+      const minH = 140;
+      const maxH = computeMaxH();
+      setHeight(clamp(next, minH, maxH));
     };
 
     const onUp = () => {
       draggingRef.current = false;
     };
 
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
     return () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
     };
-  }, [height]);
+  }, []);
 
-  // ⌘J / Ctrl+J toggle (เหมือน VSCode)
+  useEffect(() => {
+    const onResize = () => setHeight((h) => clamp(h, 140, computeMaxH()));
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const isMac = navigator.platform.toLowerCase().includes("mac");
+      const isMac =
+        typeof navigator !== "undefined" &&
+        navigator.platform.toLowerCase().includes("mac");
       const mod = isMac ? e.metaKey : e.ctrlKey;
+
       if (mod && e.key.toLowerCase() === "j") {
         e.preventDefault();
         onToggle();
       }
       if (e.key === "Escape" && open) onToggle();
     };
+
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onToggle]);
@@ -89,21 +109,20 @@ export default function BottomPanel({ open, onToggle }: Props) {
         "relative w-full",
         "bg-[#06070A]",
         "border-t border-slate-800",
+        "pb-[env(safe-area-inset-bottom)]",
       ].join(" ")}
       style={{ height: open ? height : 40 }}
     >
-      {/* Drag handle */}
       {open && (
         <div
-          onMouseDown={onMouseDownHandle}
-          className="absolute -top-1 left-0 right-0 h-2 cursor-row-resize"
+          onPointerDown={onPointerDownHandle}
+          className="absolute -top-1 left-0 right-0 h-2 cursor-row-resize touch-none"
           title="Drag to resize"
         >
           <div className="mx-auto mt-0.5 h-1 w-20 rounded-full bg-slate-500/60" />
         </div>
       )}
 
-      {/* VSCode-like tab bar */}
       <div className="flex h-10 items-center justify-between px-2">
         <div className="flex items-center gap-1">
           {TABS.map((t) => {
@@ -158,7 +177,6 @@ export default function BottomPanel({ open, onToggle }: Props) {
         </div>
       </div>
 
-      {/* Body */}
       {open && (
         <div className="h-[calc(100%-40px)] overflow-hidden px-2 pb-2">
           <div className="h-full rounded-lg border border-slate-800 bg-[#0b1120]">

@@ -20,7 +20,8 @@ import {
   type ReactFlowInstance,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { WorkspaceNode, WorkspaceNodeData } from "@/components/ingestion/space/WorkspaceNode";
+
+import { WorkspaceNode, type WorkspaceNodeData } from "@/components/ingestion/space/WorkspaceNode";
 import { Database, ChevronRight, Plus, Wrench } from "lucide-react";
 
 import {
@@ -37,6 +38,7 @@ import {
   EtlActionIcon,
   normalizeEtlAction,
   type EtlActionType,
+  getEtlActionLabel,
 } from "@/components/ingestion/space/EtlActionIcon";
 import { getDbIconForType, type DbType } from "@/components/ingestion/dbCatalog";
 
@@ -110,7 +112,7 @@ export function FlowCanvas({
   const [palettePanel, setPalettePanel] = useState<PalettePanel>("node");
 
   // minimap
-  const [minimapOpen, setMinimapOpen] = useState(true);
+  const [minimapOpen] = useState(true);
 
   // ---------- edge data helper ----------
   const withEdgeCallbacks = useCallback(
@@ -127,10 +129,10 @@ export function FlowCanvas({
             prev.map((e) =>
               e.id === id
                 ? {
-                  ...e,
-                  type: "etlSmooth",
-                  data: { ...(e.data || {}), action: undefined },
-                }
+                    ...e,
+                    type: "etlSmooth",
+                    data: { ...(e.data || {}), action: undefined },
+                  }
                 : e
             )
           );
@@ -141,81 +143,72 @@ export function FlowCanvas({
   );
 
   // ---------- ✅ Generate nodes from Workspace ----------
-const handleGenerateNodes = useCallback(
-  (specs: NodeSpec[], _meta?: { mode?: "transform" | "sql"; raw?: string }) => {
-    const COL_X: Record<NodeSpec["kind"], number> = {
-      dataset: 120,
-      field: 420,
-      source: 740,
-      sql_draft: 1020,
-    };
-
-    const baseY = 120 + Math.max(0, nodes.length) * 6;
-    const ROW_GAP = 86;
-
-    // helper: แยก schema/table จาก label (ถ้ามี "schema.table")
-    const splitSchemaTable = (label: string) => {
-      const trimmed = (label ?? "").trim();
-      const dotIdx = trimmed.indexOf(".");
-      if (dotIdx > 0) {
-        return {
-          schema: trimmed.slice(0, dotIdx),
-          table: trimmed.slice(dotIdx + 1),
-        };
-      }
-      return { schema: "", table: trimmed };
-    };
-
-    setNodes((prev) => {
-      const countByKind: Record<NodeSpec["kind"], number> = {
-        dataset: 0,
-        field: 0,
-        source: 0,
-        sql_draft: 0,
+  const handleGenerateNodes = useCallback(
+    (specs: NodeSpec[], _meta?: { mode?: "transform" | "sql"; raw?: string }) => {
+      const COL_X: Record<NodeSpec["kind"], number> = {
+        dataset: 120,
+        field: 420,
+        source: 740,
+        sql_draft: 1020,
       };
 
-      for (const n of prev as any[]) {
-        const k = (n?.data as any)?.kind as NodeSpec["kind"] | undefined;
-        if (k && k in countByKind) countByKind[k] += 1;
-      }
+      const baseY = 120 + Math.max(0, nodes.length) * 6;
+      const ROW_GAP = 86;
 
-      const created: AppNode[] = specs.map((s) => {
-        const idx = countByKind[s.kind];
-        countByKind[s.kind] += 1;
+      const splitSchemaTable = (label: string) => {
+        const trimmed = (label ?? "").trim();
+        const dotIdx = trimmed.indexOf(".");
+        if (dotIdx > 0) {
+          return {
+            schema: trimmed.slice(0, dotIdx),
+            table: trimmed.slice(dotIdx + 1),
+          };
+        }
+        return { schema: "", table: trimmed };
+      };
 
-        const id = crypto.randomUUID();
-        const { schema: sSchema, table: sTable } = splitSchemaTable(s.label);
-
-        const data: WorkspaceNodeData = {
-          label: sTable || s.label, // ใช้ label โชว์บน node
-          kind: s.kind,
-          payload: s.payload ?? null,
-          // ถ้าอยากโชว์ schema ด้วย ให้คอมเมนต์บรรทัดบน แล้วใช้บรรทัดนี้แทน:
-          // label: sSchema ? `${sSchema}.${sTable || s.label}` : (sTable || s.label),
+      setNodes((prev) => {
+        const countByKind: Record<NodeSpec["kind"], number> = {
+          dataset: 0,
+          field: 0,
+          source: 0,
+          sql_draft: 0,
         };
 
-        return {
-          id,
-          type: "workspaceNode",
-          position: { x: COL_X[s.kind], y: baseY + idx * ROW_GAP },
+        for (const n of prev as any[]) {
+          const k = (n?.data as any)?.kind as NodeSpec["kind"] | undefined;
+          if (k && k in countByKind) countByKind[k] += 1;
+        }
 
-          // ✅ บังคับ handle ซ้าย/ขวา
-          targetPosition: Position.Left,
-          sourcePosition: Position.Right,
+        const created: AppNode[] = specs.map((s) => {
+          const idx = countByKind[s.kind];
+          countByKind[s.kind] += 1;
 
-          data,
-        } as AppNode;
+          const id = crypto.randomUUID();
+          const { table: sTable } = splitSchemaTable(s.label);
+
+          const data: WorkspaceNodeData = {
+            label: sTable || s.label,
+            kind: s.kind,
+            payload: s.payload ?? null,
+          };
+
+          return {
+            id,
+            type: "workspaceNode",
+            position: { x: COL_X[s.kind], y: baseY + idx * ROW_GAP },
+            targetPosition: Position.Left,
+            sourcePosition: Position.Right,
+            data,
+          } as AppNode;
+        });
+
+        return [...prev, ...created];
       });
+    },
+    [nodes.length, setNodes]
+  );
 
-      return [...prev, ...created];
-    });
-  },
-  [nodes.length, setNodes]
-);
-
-
-
-  // ✅ expose generate handler to parent (SpaceDetailPage)
   useEffect(() => {
     if (!onProvideGenerateHandler) return;
     onProvideGenerateHandler(handleGenerateNodes);
@@ -300,17 +293,16 @@ const handleGenerateNodes = useCallback(
       setEdges((els) => {
         const next = reconnectEdge(oldEdge, newConnection, els) as AppEdge[];
 
-        // บังคับ type + callback กลับ (กันหลุด)
         return next.map((e) =>
           e.id === oldEdge.id
             ? {
-              ...e,
-              type: "etlSmooth",
-              data: {
-                ...(e.data || {}),
-                ...withEdgeCallbacks(e.id),
-              },
-            }
+                ...e,
+                type: "etlSmooth",
+                data: {
+                  ...(e.data || {}),
+                  ...withEdgeCallbacks(e.id),
+                },
+              }
             : e
         );
       });
@@ -318,66 +310,12 @@ const handleGenerateNodes = useCallback(
     [withEdgeCallbacks]
   );
 
-  // ✅ ถ้า reconnect fail → ลบ edge (ตาม logic เดิมของคุณ)
   const onReconnectEnd = useCallback((_event: any, edge: AppEdge) => {
     if (!edgeReconnectSuccessful.current) {
       setEdges((eds) => eds.filter((e) => e.id !== edge.id));
     }
     edgeReconnectSuccessful.current = true;
   }, []);
-
-  // ✅ คลิก node → update query โดย "ไม่ทิ้ง left เดิม"
-  const onNodeClick: NodeMouseHandler<AppNode> = useCallback(
-    (event, node) => {
-      event.preventDefault();
-      event.stopPropagation();
-
-      const d = node.data as any; // FlowNodeData
-
-      // ✅ 1) เก็บ payload ลง sessionStorage ให้ NodeDetail อ่านได้
-      try {
-        const key = `nodePreview:${slug}:${node.id}`;
-        sessionStorage.setItem(
-          key,
-          JSON.stringify({
-            connectionId: d.connectionId,
-            connectionName: d.connectionName,
-            schema: d.schema,
-            table: d.table,
-          })
-        );
-      } catch { }
-
-      // ✅ 2) ใส่ query เพิ่ม (ไม่ทิ้ง left เดิม)
-      const qp = new URLSearchParams(searchParams.toString());
-      qp.set("nodeId", node.id);
-      qp.set("schema", d.schema || "public");
-      qp.set("table", d.table || "");
-      if (d.connectionId) qp.set("connectionId", d.connectionId);
-      if (d.connectionName) qp.set("connection", d.connectionName);
-
-      router.push(`${pathname}?${qp.toString()}`);
-    },
-    [router, pathname, searchParams, slug]
-  );
-
-  // (ถ้ายังอยากใช้ดับเบิ้ลคลิกด้วยก็ผูกให้เหมือนกัน)
-  const onNodeDoubleClick: NodeMouseHandler<AppNode> = useCallback(
-    (event, node) => {
-      event.preventDefault();
-      event.stopPropagation();
-
-      const d = node.data as FlowNodeData;
-
-      const qp = new URLSearchParams(searchParams.toString());
-      qp.set("nodeId", node.id);
-      qp.set("schema", d.schema || "public");
-      qp.set("table", d.table || "");
-
-      router.push(`${pathname}?${qp.toString()}`);
-    },
-    [router, pathname, searchParams]
-  );
 
   const onEdgeClick: EdgeMouseHandler<AppEdge> = useCallback((_event, edge) => {
     setSelectedEdgeId(edge.id);
@@ -458,15 +396,15 @@ const handleGenerateNodes = useCallback(
             eds.map((e) =>
               e.id === targetId
                 ? {
-                  ...e,
-                  type: "etlSmooth",
-                  data: {
-                    ...(e.data || {}),
-                    action: normalized,
-                    spaceSlug: slug,
-                    ...withEdgeCallbacks(e.id),
-                  },
-                }
+                    ...e,
+                    type: "etlSmooth",
+                    data: {
+                      ...(e.data || {}),
+                      action: normalized,
+                      spaceSlug: slug,
+                      ...withEdgeCallbacks(e.id),
+                    },
+                  }
                 : e
             )
           );
@@ -502,14 +440,13 @@ const handleGenerateNodes = useCallback(
           type: "dbNode",
           position: flowPos,
           data: {
-            connectionId: tmpl.connectionId, // ✅ เพิ่มบรรทัดนี้
+            connectionId: tmpl.connectionId,
             connectionName,
             schema: tmpl.schema,
             table: tmpl.table,
             dbIcon,
             dbType,
             onOpen: () => {
-              // 1) เก็บ payload ให้ NodeDetail อ่าน (ยังไม่มี API ก็ใส่ meta ก่อน)
               try {
                 const key = `nodePreview:${slug}:${id}`;
                 sessionStorage.setItem(
@@ -520,9 +457,8 @@ const handleGenerateNodes = useCallback(
                     table: tmpl.table,
                   })
                 );
-              } catch { }
+              } catch {}
 
-              // 2) push ไปหน้า detail พร้อม query
               const qp = new URLSearchParams();
               qp.set("nodeId", id);
               qp.set("connectionId", tmpl.connectionId);
@@ -535,7 +471,6 @@ const handleGenerateNodes = useCallback(
                 )}?${qp.toString()}`
               );
             },
-
             onDelete: () => {
               setNodes((current) => current.filter((n) => n.id !== id));
               setEdges((eds) =>
@@ -572,15 +507,15 @@ const handleGenerateNodes = useCallback(
       return eds.map((e) =>
         e.id === targetId
           ? {
-            ...e,
-            type: "etlSmooth",
-            data: {
-              ...(e.data || {}),
-              action,
-              spaceSlug: slug,
-              ...withEdgeCallbacks(e.id),
-            },
-          }
+              ...e,
+              type: "etlSmooth",
+              data: {
+                ...(e.data || {}),
+                action,
+                spaceSlug: slug,
+                ...withEdgeCallbacks(e.id),
+              },
+            }
           : e
       );
     });
@@ -602,6 +537,7 @@ const handleGenerateNodes = useCallback(
         onDrop={handleDropOnFlow}
         onDragOver={handleDragOverFlow}
       >
+        {/* ✅ ReactFlow canvas layer */}
         <ReactFlow<AppNode, AppEdge>
           nodes={nodes}
           edges={edges}
@@ -613,14 +549,12 @@ const handleGenerateNodes = useCallback(
           onReconnect={onReconnect}
           onReconnectStart={onReconnectStart}
           onReconnectEnd={onReconnectEnd}
-          // onNodeClick={onNodeClick}
           onEdgeClick={onEdgeClick}
           onPaneClick={onPaneClick}
           onInit={(instance) => setRfInstance(instance)}
           defaultViewport={{ x: 0, y: 0, zoom: 0.9 }}
           className="h-full w-full"
           edgesReconnectable={true}
-          // ✅ กัน double click ถูกใช้ไป zoom
           zoomOnDoubleClick={false}
         >
           <Background
@@ -634,14 +568,16 @@ const handleGenerateNodes = useCallback(
             <MiniMap
               pannable
               zoomable
+              position="bottom-right"
               className="reactflow-minimap"
               style={{
-                background: "rgba(71, 85, 105, 0.6)",
-                border: "1px solid rgba(71, 85, 105, 0.6)",
+                background: "rgba(71, 85, 105, 0.55)",
+                border: "1px solid rgba(71, 85, 105, 0.55)",
                 borderRadius: 16,
-                boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
+                boxShadow: "0 20px 60px rgba(0,0,0,0.35)",
+                margin: 12, // ✅ เว้นขอบไม่ชน dock
               }}
-              maskColor="rgba(2, 6, 23, 0.4)"
+              maskColor="rgba(2, 6, 23, 0.42)"
               nodeColor={() => "rgba(56, 189, 248, 0.85)"}
               nodeStrokeColor={() => "rgba(125, 211, 252, 0.95)"}
               nodeStrokeWidth={1.3}
@@ -651,10 +587,10 @@ const handleGenerateNodes = useCallback(
           <Controls className="reactflow-controls" position="bottom-left" />
         </ReactFlow>
 
-        {/* Node palette */}
-        <div className="pointer-events-auto absolute right-4 top-4 z-30">
+        {/* ✅ Docked Palette (อยู่ใน Flow space จริง ๆ) */}
+        <div className="pointer-events-auto absolute right-4 top-4 z-30 max-h-[calc(100%-32px)]">
           {paletteOpen ? (
-            <div className="w-80 rounded-2xl bg-slate-900/95 p-3 text-xs text-slate-100 shadow-xl backdrop-blur-md">
+            <div className="w-[360px] max-w-[calc(100vw-32px)] max-h-[calc(100%-0px)] overflow-hidden rounded-2xl bg-slate-900/95 p-3 text-xs text-slate-100 shadow-xl backdrop-blur-md">
               {/* header */}
               <div className="mb-2 flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -718,7 +654,7 @@ const handleGenerateNodes = useCallback(
                       ยังไม่มี template — กดปุ่ม + เพื่อสร้าง node template
                     </p>
                   ) : (
-                    <div className="max-h-72 space-y-2 overflow-y-auto pr-1 node-palette-scroll">
+                    <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1 node-palette-scroll">
                       {templates.map((t) => {
                         const conn = resolveConnectionById(t.connectionId);
                         const dbType = conn?.type as DbType | undefined;
@@ -762,24 +698,25 @@ const handleGenerateNodes = useCallback(
                     </div>
                   )
                 ) : (
-                  <div className="max-h-[420px] overflow-y-auto pr-1 node-palette-scroll">
+                  <div className="max-h-[520px] overflow-y-auto pr-1 node-palette-scroll">
                     {ETL_GROUPS.map((group) => (
                       <div key={group.label} className="mt-3">
                         <p className="text-[10px] font-semibold uppercase text-slate-400">
                           {group.label}
                         </p>
 
-                        <div className="mt-1 flex flex-wrap gap-1.5">
+                        <div className="mt-2 grid grid-cols-2 gap-2">
                           {group.actions.map((action) => (
                             <button
                               key={action}
                               draggable
                               onDragStart={(e) => handleEtlDragStart(action, e)}
                               onClick={() => applyActionToSelectedEdge(action)}
-                              className="inline-flex items-center gap-1 rounded-full bg-slate-800/80 px-2.5 py-1 text-[10px] text-slate-100 hover:bg-slate-700"
+                              className="inline-flex items-center gap-2 rounded-full bg-slate-800/80 px-3 py-2 text-[12px] text-slate-100 hover:bg-slate-700"
+                              title={getEtlActionLabel(action)}
                             >
                               <EtlActionIcon action={action} compact />
-                              <span className="capitalize">{action}</span>
+                              <span className="truncate">{getEtlActionLabel(action)}</span>
                             </button>
                           ))}
                         </div>
@@ -790,10 +727,16 @@ const handleGenerateNodes = useCallback(
               </div>
             </div>
           ) : (
+            // ✅ collapsed button remains docked inside Flow space
             <button
               type="button"
               onClick={() => setPaletteOpen(true)}
-              className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-900/90 text-slate-100 shadow-lg hover:bg-slate-800"
+              className={[
+                "inline-flex h-11 w-11 items-center justify-center rounded-full",
+                "bg-slate-900/85 text-slate-100 shadow-lg",
+                "ring-1 ring-slate-700/70 hover:bg-slate-800/90",
+                "backdrop-blur-md",
+              ].join(" ")}
               title="Open palette"
             >
               <ChevronRight className="h-5 w-5" />

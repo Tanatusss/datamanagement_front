@@ -19,9 +19,20 @@ import {
   FunctionSquare,
   Database,
   HardDriveUpload,
+  Copy,
+  LayoutGrid,
+  FlipVertical,
+  ScanText,
+  Wand2,
+  Sparkles,
+  Percent,
+  Shuffle,
+  ArrowDownToLine,
+  ArrowUpFromLine,
 } from "lucide-react";
 
 export type EtlActionType =
+  // ===== Common =====
   | "aggregate"
   | "balanced"
   | "conditional"
@@ -36,12 +47,24 @@ export type EtlActionType =
   | "scd"
   | "sort"
   | "union"
+
+  // ===== Other Transforms =====
+  | "copyColumn"
+  | "pivot"
+  | "unpivot"
+  | "audit"
+  | "characterMap"
+  | "percentageSampling"
+  | "rowSampling"
+  | "importColumn"
+  | "exportColumn"
+  | "fuzzyLookup"
+  | "fuzzyGrouping"
+
+  // ===== IO =====
   | "source"
   | "destination";
 
-
-
-  
 type Props = {
   action: EtlActionType;
   compact?: boolean;
@@ -56,6 +79,7 @@ const CONFIG: Record<
     dot: string;
   }
 > = {
+  // ===== Common =====
   aggregate: {
     label: "Aggregate",
     icon: <Sigma className="h-3.5 w-3.5" />,
@@ -140,6 +164,76 @@ const CONFIG: Record<
     wrapper: "bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-200",
     dot: "bg-fuchsia-400",
   },
+
+  // ===== Other Transforms =====
+  copyColumn: {
+    label: "Copy Column",
+    icon: <Copy className="h-3.5 w-3.5" />,
+    wrapper: "bg-zinc-50 text-zinc-700 border border-zinc-200",
+    dot: "bg-zinc-400",
+  },
+  pivot: {
+    label: "Pivot",
+    icon: <LayoutGrid className="h-3.5 w-3.5" />,
+    wrapper: "bg-purple-50 text-purple-700 border border-purple-200",
+    dot: "bg-purple-400",
+  },
+  unpivot: {
+    label: "Unpivot",
+    icon: <FlipVertical className="h-3.5 w-3.5" />,
+    wrapper: "bg-purple-50 text-purple-700 border border-purple-200",
+    dot: "bg-purple-400",
+  },
+  audit: {
+    label: "Audit",
+    icon: <ScanText className="h-3.5 w-3.5" />,
+    wrapper: "bg-stone-50 text-stone-700 border border-stone-200",
+    dot: "bg-stone-400",
+  },
+  characterMap: {
+    label: "Char Map",
+    icon: <Wand2 className="h-3.5 w-3.5" />,
+    wrapper: "bg-yellow-50 text-yellow-700 border border-yellow-200",
+    dot: "bg-yellow-400",
+  },
+  percentageSampling: {
+    label: "Sampling %",
+    icon: <Percent className="h-3.5 w-3.5" />,
+    wrapper: "bg-orange-50 text-orange-700 border border-orange-200",
+    dot: "bg-orange-400",
+  },
+  rowSampling: {
+    label: "Row Sampling",
+    icon: <Shuffle className="h-3.5 w-3.5" />,
+    wrapper: "bg-orange-50 text-orange-700 border border-orange-200",
+    dot: "bg-orange-400",
+  },
+  importColumn: {
+    label: "Import Col",
+    icon: <ArrowDownToLine className="h-3.5 w-3.5" />,
+    wrapper: "bg-slate-50 text-slate-700 border border-slate-200",
+    dot: "bg-slate-400",
+  },
+  exportColumn: {
+    label: "Export Col",
+    icon: <ArrowUpFromLine className="h-3.5 w-3.5" />,
+    wrapper: "bg-slate-50 text-slate-700 border border-slate-200",
+    dot: "bg-slate-400",
+  },
+  fuzzyLookup: {
+    label: "Fuzzy Lookup",
+    icon: <Sparkles className="h-3.5 w-3.5" />,
+    wrapper: "bg-pink-50 text-pink-700 border border-pink-200",
+    dot: "bg-pink-400",
+  },
+  fuzzyGrouping: {
+    label: "Fuzzy Group",
+    icon: <Sparkles className="h-3.5 w-3.5" />,
+    wrapper: "bg-pink-50 text-pink-700 border border-pink-200",
+    dot: "bg-pink-400",
+  },
+
+  // ===== IO =====
   source: {
     label: "Source",
     icon: <Database className="h-3.5 w-3.5" />,
@@ -154,32 +248,44 @@ const CONFIG: Record<
   },
 };
 
+export function getEtlActionLabel(action: EtlActionType) {
+  return CONFIG[action]?.label ?? action;
+}
 
-export function normalizeEtlAction(
-  raw?: string
-): EtlActionType | undefined {
+export function normalizeEtlAction(raw?: string): EtlActionType | undefined {
   if (!raw) return undefined;
 
   switch (raw) {
-    case "convert":
-      return "convert";
     case "merge_join":
       return "mergeJoin";
     case "row_count":
       return "rowCount";
+    case "copy_column":
+      return "copyColumn";
+    case "character_map":
+      return "characterMap";
+    case "percentage_sampling":
+      return "percentageSampling";
+    case "row_sampling":
+      return "rowSampling";
+    case "fuzzy_lookup":
+      return "fuzzyLookup";
+    case "fuzzy_grouping":
+      return "fuzzyGrouping";
+    case "import_column":
+      return "importColumn";
+    case "export_column":
+      return "exportColumn";
     default:
       return raw as EtlActionType;
   }
 }
 
-
 export function EtlActionIcon({ action, compact = false }: Props) {
   const cfg = CONFIG[action];
 
-  // ⭐ กันพัง + debug ง่าย
   if (!cfg) {
     console.warn("Unknown ETL action:", action);
-
     return (
       <div className="inline-flex items-center rounded-full border border-red-300 bg-red-50 px-2 py-1 text-[10px] font-semibold text-red-700">
         Unknown

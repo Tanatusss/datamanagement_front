@@ -9,6 +9,29 @@ import { AnalyzeModal } from "@/components/ingestion/space/AnalyzeModal";
 import { useConnections } from "@/components/ingestion/ConnectionsContext";
 import { getDbIconForType, type DbType } from "@/components/ingestion/dbCatalog";
 
+// ✅ Charts
+import {
+  Chart as ChartJS,
+  LineElement,
+  BarElement,
+  PointElement,
+  CategoryScale,
+  LinearScale,
+  Tooltip,
+  Legend,
+} from "chart.js";
+import { Line, Bar } from "react-chartjs-2";
+
+ChartJS.register(
+  LineElement,
+  BarElement,
+  PointElement,
+  CategoryScale,
+  LinearScale,
+  Tooltip,
+  Legend
+);
+
 type TabKey = "summary" | "explore" | "chart";
 
 type Row = {
@@ -116,16 +139,16 @@ type ColumnId = (typeof COLUMNS)[number]["id"];
 
 type SortConfig =
   | {
-      columnId: ColumnId;
-      direction: "asc" | "desc";
-    }
+    columnId: ColumnId;
+    direction: "asc" | "desc";
+  }
   | null;
 
 type FilterConfig =
   | {
-      columnId: ColumnId;
-      value: string;
-    }
+    columnId: ColumnId;
+    value: string;
+  }
   | null;
 
 function safeDecode(v: string) {
@@ -140,6 +163,8 @@ function safeDecode(v: string) {
 const BASE_PATH = (process.env.NEXT_PUBLIC_BASE_PATH ?? "").replace(/\/$/, "");
 function withBasePath(p?: string) {
   if (!p) return "";
+  if (!BASE_PATH) return p;
+  if (p === BASE_PATH || p.startsWith(`${BASE_PATH}/`)) return p;
   if (!p.startsWith("/")) return `${BASE_PATH}/${p}`;
   return `${BASE_PATH}${p}`;
 }
@@ -196,7 +221,6 @@ export default function NodeDetailPage() {
         const payload = JSON.parse(raw);
         if (!alive) return;
 
-        // keep meta (ไว้ใช้ resolve connection)
         const meta: PayloadMeta = {
           connectionId: payload?.connectionId
             ? String(payload.connectionId)
@@ -208,11 +232,9 @@ export default function NodeDetailPage() {
         };
         setPayloadMeta(meta);
 
-        // override meta เฉพาะถ้ามีค่า (ไม่งั้นใช้จาก query)
         if (meta.connectionName) setConnectionName(meta.connectionName);
         if (meta.table) setTable(meta.table);
 
-        // rows
         const r = Array.isArray(payload?.rows) ? payload.rows : [];
         if (r.length) {
           const mapped = r.map((x: any, idx: number) => ({
@@ -224,7 +246,6 @@ export default function NodeDetailPage() {
             balance: Number(x.balance ?? 0),
           }));
 
-          // ✅ ถ้า payload มีน้อย (เช่น 2 แถว) เติม mock ต่อท้ายให้เห็นหลายแถวตามต้องการ
           const merged =
             mapped.length < INITIAL_ROWS.length
               ? [...mapped, ...INITIAL_ROWS.slice(mapped.length)]
@@ -242,7 +263,6 @@ export default function NodeDetailPage() {
       // ignore
     }
 
-    // fallback if no payload
     if (alive) {
       setRows(INITIAL_ROWS);
       setLoadingRows(false);
@@ -266,10 +286,8 @@ export default function NodeDetailPage() {
 
   const dbType: DbType | undefined = rawConnection?.type as DbType | undefined;
 
-  // IMPORTANT: use <img> and ensure basePath
-  const dbIcon: string | undefined = dbType
-    ? getDbIconForType(dbType) // ✅ เหมือนหน้า create node
-    : undefined;
+  // ✅ สำคัญ: อย่า withBasePath ซ้อนในนี้ (กัน /dmp/dmp)
+  const dbIcon: string | undefined = dbType ? getDbIconForType(dbType) : undefined;
 
   const [activeTab, setActiveTab] = useState<TabKey>("summary");
   const [openMenuCol, setOpenMenuCol] = useState<ColumnId | null>(null);
@@ -278,9 +296,7 @@ export default function NodeDetailPage() {
   const [editingCol, setEditingCol] = useState<ColumnId | null>(null);
   const [sortConfig, setSortConfig] = useState<SortConfig>(null);
   const [filterConfig, setFilterConfig] = useState<FilterConfig>(null);
-  const [pendingFilterCol, setPendingFilterCol] = useState<ColumnId | null>(
-    null
-  );
+  const [pendingFilterCol, setPendingFilterCol] = useState<ColumnId | null>(null);
   const [filterValueInput, setFilterValueInput] = useState("");
 
   const handleHeaderClick = (colId: ColumnId) => {
@@ -386,6 +402,88 @@ export default function NodeDetailPage() {
   const activeSortLabel =
     sortConfig && COLUMNS.find((c) => c.id === sortConfig.columnId)?.label;
 
+  // ✅ Chart rows: ถ้า filter แล้วว่าง ให้ยังมีตัวอย่างกราฟจาก mock
+  const chartRows = processedRows.length ? processedRows : INITIAL_ROWS;
+
+  const lineLabels = useMemo(() => chartRows.map((r) => r.date), [chartRows]);
+
+  const amountLineData = useMemo(() => {
+    return {
+      labels: lineLabels,
+      datasets: [
+        {
+          label: "Amount",
+          data: chartRows.map((r) => r.amount),
+          tension: 0.35,
+          pointRadius: 2,
+          borderWidth: 2,
+          borderColor: "rgba(14, 165, 233, 0.95)", // sky-500
+          backgroundColor: "rgba(14, 165, 233, 0.15)",
+          pointBackgroundColor: "rgba(14, 165, 233, 0.95)",
+          fill: false,
+        },
+        {
+          label: "Balance",
+          data: chartRows.map((r) => r.balance),
+          tension: 0.35,
+          pointRadius: 2,
+          borderWidth: 2,
+          borderColor: "rgba(148, 163, 184, 0.95)", // slate-400
+          backgroundColor: "rgba(148, 163, 184, 0.12)",
+          pointBackgroundColor: "rgba(148, 163, 184, 0.95)",
+          fill: false,
+        },
+      ],
+    };
+  }, [lineLabels, chartRows]);
+
+
+  const categoryBarData = useMemo(() => {
+    const byCategory = chartRows.reduce<Record<string, number>>((acc, r) => {
+      const key = r.category || "Unknown";
+      acc[key] = (acc[key] ?? 0) + Number(r.amount ?? 0);
+      return acc;
+    }, {});
+
+    return {
+      labels: Object.keys(byCategory),
+      datasets: [
+        {
+          label: "Sum(amount)",
+          data: Object.values(byCategory),
+          borderWidth: 1,
+          borderColor: "rgba(14, 165, 233, 0.85)",
+          backgroundColor: "rgba(14, 165, 233, 0.35)", 
+        },
+      ],
+    };
+  }, [chartRows]);
+
+
+  const chartOptions = useMemo(() => {
+    return {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: true,
+          labels: { color: "#e2e8f0" },
+        },
+        tooltip: { enabled: true },
+      },
+      scales: {
+        x: {
+          ticks: { color: "#94a3b8" },
+          grid: { color: "rgba(148,163,184,0.12)" },
+        },
+        y: {
+          ticks: { color: "#94a3b8" },
+          grid: { color: "rgba(148,163,184,0.12)" },
+        },
+      },
+    } as const;
+  }, []);
+
   return (
     <div className="space-y-5 text-slate-100">
       {/* TOPBAR */}
@@ -408,7 +506,8 @@ export default function NodeDetailPage() {
             >
               {dbIcon ? (
                 <img
-                  src={dbIcon}
+                  // ✅ ห่อ basePath ตรงนี้เท่านั้น (กันซ้อน /dmp/dmp)
+                  src={withBasePath(dbIcon)}
                   alt={dbType || connectionName}
                   className="h-8 w-8 object-contain"
                   draggable={false}
@@ -444,8 +543,8 @@ export default function NodeDetailPage() {
                 key === "summary"
                   ? "Summary"
                   : key === "explore"
-                  ? "Explore"
-                  : "Chart";
+                    ? "Explore"
+                    : "Chart";
               const isActive = activeTab === key;
 
               return (
@@ -466,207 +565,291 @@ export default function NodeDetailPage() {
         </div>
 
         <div className="px-4 pb-5 pt-4">
-          <div className="overflow-hidden rounded-xl border border-slate-700">
-            <div className="bg-slate-900 px-4 py-2 text-[11px] font-medium text-slate-300 border-b border-slate-700 flex items-center justify-between">
-              <span>{table}</span>
-              <div className="flex items-center gap-2">
-                {loadingRows && (
-                  <span className="text-[11px] text-slate-400">Loading...</span>
+          {/* ✅ TAB CONTENT SWITCH */}
+          {activeTab === "chart" ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                {/* Chart 1 */}
+                <div className="rounded-2xl border border-slate-700 bg-slate-950/40 p-4">
+                  <div className="mb-2 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-50">
+                        Amount & Balance
+                      </p>
+                      <p className="text-[11px] text-slate-400">By date</p>
+                    </div>
+                    {loadingRows && (
+                      <span className="text-[11px] text-slate-400">
+                        Loading...
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="h-[280px]">
+                    <Line
+                      data={amountLineData as any}
+                      options={chartOptions as any}
+                    />
+                  </div>
+
+                  <p className="mt-2 text-[10px] text-slate-500">
+                    * uses filtered rows; if empty, falls back to mock rows.
+                  </p>
+                </div>
+
+                {/* Chart 2 */}
+                <div className="rounded-2xl border border-slate-700 bg-slate-950/40 p-4">
+                  <div className="mb-2">
+                    <p className="text-sm font-semibold text-slate-50">
+                      Category breakdown
+                    </p>
+                    <p className="text-[11px] text-slate-400">
+                      Sum(amount) by category
+                    </p>
+                  </div>
+
+                  <div className="h-[280px]">
+                    <Bar
+                      data={categoryBarData as any}
+                      options={chartOptions as any}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* chips/status */}
+              <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+                {activeFilterLabel && filterConfig?.value && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-900/40 px-2 py-0.5 text-[10px] text-emerald-300">
+                    Filter:{" "}
+                    <span className="font-mono">
+                      {activeFilterLabel} ~ "{filterConfig.value}"
+                    </span>
+                    <button
+                      type="button"
+                      onClick={clearFilter}
+                      className="ml-1 text-[10px] underline"
+                    >
+                      clear
+                    </button>
+                  </span>
+                )}
+
+                {activeSortLabel && sortConfig && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-sky-900/40 px-2 py-0.5 text-[10px] text-sky-300">
+                    Sort:{" "}
+                    <span className="font-mono">
+                      {activeSortLabel} ({sortConfig.direction})
+                    </span>
+                  </span>
                 )}
               </div>
             </div>
-
-            {pendingFilterCol && (
-              <div className="flex items-center gap-2 border-b border-slate-700 bg-slate-900 px-3 py-2 text-[11px] text-slate-200">
-                <span className="font-medium">
-                  Filter on{" "}
-                  {COLUMNS.find((c) => c.id === pendingFilterCol)?.label}:
-                </span>
-
-                {pendingFilterCol === "category" ? (
-                  <select
-                    className="flex-1 rounded border border-slate-600 px-2 py-1 text-[11px] bg-slate-900 text-slate-100"
-                    value={filterValueInput}
-                    onChange={(e) => setFilterValueInput(e.target.value)}
-                  >
-                    <option value="">-- เลือก category --</option>
-                    {[...new Set(rows.map((r) => r.category))].map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    className="flex-1 rounded border border-slate-600 px-2 py-1 text-[11px] bg-slate-900 text-slate-100"
-                    placeholder="พิมพ์คำที่ต้องการค้นหาในคอลัมน์นี้..."
-                    value={filterValueInput}
-                    onChange={(e) => setFilterValueInput(e.target.value)}
-                  />
-                )}
-
-                <button
-                  type="button"
-                  onClick={applyFilter}
-                  className="rounded-full border border-slate-500 px-3 py-1 text-[11px] font-medium text-slate-100 hover:bg-slate-800"
-                >
-                  Apply
-                </button>
-                <button
-                  type="button"
-                  onClick={clearFilter}
-                  className="rounded-full px-3 py-1 text-[11px] font-medium text-slate-300 hover:bg-slate-800"
-                >
-                  Clear
-                </button>
-              </div>
-            )}
-
-            <div className="max-h-[420px] overflow-auto">
-              <table className="min-w-full text-left">
-                <thead className="bg-slate-900 text-[11px] text-slate-400 border-b border-slate-700">
-                  <tr>
-                    {COLUMNS.map((col) => (
-                      <th key={col.id} className="relative px-3 py-2">
-                        <button
-                          type="button"
-                          onClick={() => handleHeaderClick(col.id)}
-                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-md hover:bg-slate-800 ${
-                            openMenuCol === col.id ? "bg-slate-800" : ""
-                          }`}
-                        >
-                          <span className="font-mono text-[11px]">
-                            {col.label}
-                            {sortIconFor(col.id) && (
-                              <span className="ml-1">{sortIconFor(col.id)}</span>
-                            )}
-                          </span>
-                          <ChevronDown className="h-3 w-3 text-slate-500" />
-                        </button>
-
-                        {openMenuCol === col.id && (
-                          <div className="absolute left-1 top-full z-20 mt-1 w-40 rounded-lg border border-slate-700 bg-slate-900 py-1 text-[11px] text-slate-100 shadow-xl">
-                            <button
-                              type="button"
-                              onClick={() => handleMenuSelect("analyze", col.id)}
-                              className="block w-full px-3 py-1 text-left hover:bg-slate-800"
-                            >
-                              Analyze
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleMenuSelect("edit-column", col.id)}
-                              className="block w-full px-3 py-1 text-left hover:bg-slate-800"
-                            >
-                              {editingCol === col.id
-                                ? "Stop editing"
-                                : "Edit column"}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleMenuSelect("filter", col.id)}
-                              className="block w-full px-3 py-1 text-left hover:bg-slate-800"
-                            >
-                              Filter
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleMenuSelect("sort", col.id)}
-                              className="block w-full px-3 py-1 text-left hover:bg-slate-800"
-                            >
-                              Sort
-                            </button>
-                          </div>
-                        )}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-
-                <tbody className="divide-y divide-slate-800 bg-slate-950/60">
-                  {processedRows.map((row) => (
-                    <tr key={row.id} className="hover:bg-slate-900/80">
-                      {COLUMNS.map((col) => {
-                        const isEditing = editingCol === col.id;
-                        const rawValue = (row as any)[col.id];
-
-                        return (
-                          <td
-                            key={col.id}
-                            className="px-3 py-2 text-[11px] text-slate-100 whitespace-nowrap"
-                          >
-                            {isEditing ? (
-                              <input
-                                className="w-full rounded border border-slate-700 bg-slate-900 px-1 py-0.5 text-[11px] text-slate-100"
-                                value={String(rawValue ?? "")}
-                                onChange={(e) => {
-                                  const value = e.target.value;
-                                  setRows((prev) =>
-                                    prev.map((r) =>
-                                      r.id === row.id
-                                        ? { ...r, [col.id]: value }
-                                        : r
-                                    )
-                                  );
-                                }}
-                              />
-                            ) : (
-                              String(rawValue ?? "")
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-
-                  {!processedRows.length && !loadingRows && (
-                    <tr>
-                      <td
-                        colSpan={COLUMNS.length}
-                        className="px-4 py-10 text-center text-sm text-slate-400"
-                      >
-                        No rows
-                      </td>
-                    </tr>
+          ) : (
+            // ✅ TABLE (Summary/Explore)
+            <div className="overflow-hidden rounded-xl border border-slate-700">
+              <div className="bg-slate-900 px-4 py-2 text-[11px] font-medium text-slate-300 border-b border-slate-700 flex items-center justify-between">
+                <span>{table}</span>
+                <div className="flex items-center gap-2">
+                  {loadingRows && (
+                    <span className="text-[11px] text-slate-400">Loading...</span>
                   )}
-                </tbody>
-              </table>
+                </div>
+              </div>
+
+              {pendingFilterCol && (
+                <div className="flex items-center gap-2 border-b border-slate-700 bg-slate-900 px-3 py-2 text-[11px] text-slate-200">
+                  <span className="font-medium">
+                    Filter on{" "}
+                    {COLUMNS.find((c) => c.id === pendingFilterCol)?.label}:
+                  </span>
+
+                  {pendingFilterCol === "category" ? (
+                    <select
+                      className="flex-1 rounded border border-slate-600 px-2 py-1 text-[11px] bg-slate-900 text-slate-100"
+                      value={filterValueInput}
+                      onChange={(e) => setFilterValueInput(e.target.value)}
+                    >
+                      <option value="">-- เลือก category --</option>
+                      {[...new Set(rows.map((r) => r.category))].map((cat) => (
+                        <option key={cat} value={cat}>
+                          {cat}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      className="flex-1 rounded border border-slate-600 px-2 py-1 text-[11px] bg-slate-900 text-slate-100"
+                      placeholder="พิมพ์คำที่ต้องการค้นหาในคอลัมน์นี้..."
+                      value={filterValueInput}
+                      onChange={(e) => setFilterValueInput(e.target.value)}
+                    />
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={applyFilter}
+                    className="rounded-full border border-slate-500 px-3 py-1 text-[11px] font-medium text-slate-100 hover:bg-slate-800"
+                  >
+                    Apply
+                  </button>
+                  <button
+                    type="button"
+                    onClick={clearFilter}
+                    className="rounded-full px-3 py-1 text-[11px] font-medium text-slate-300 hover:bg-slate-800"
+                  >
+                    Clear
+                  </button>
+                </div>
+              )}
+
+              <div className="max-h-[420px] overflow-auto">
+                <table className="min-w-full text-left">
+                  <thead className="bg-slate-900 text-[11px] text-slate-300 border-b border-slate-700">
+                    <tr>
+                      {COLUMNS.map((col) => (
+                        <th key={col.id} className="relative px-3 py-2">
+                          <button
+                            type="button"
+                            onClick={() => handleHeaderClick(col.id)}
+                            className={`inline-flex items-center gap-1 px-2 py-1 rounded-md hover:bg-slate-800 ${openMenuCol === col.id ? "bg-slate-800" : ""
+                              }`}
+                          >
+                            <span className="font-mono text-[11px]">
+                              {col.label}
+                              {sortIconFor(col.id) && (
+                                <span className="ml-1">{sortIconFor(col.id)}</span>
+                              )}
+                            </span>
+                            <ChevronDown className="h-3 w-3 text-slate-500" />
+                          </button>
+
+                          {openMenuCol === col.id && (
+                            <div className="absolute left-1 top-full z-20 mt-1 w-40 rounded-lg border border-slate-700 bg-slate-900 py-1 text-[11px] text-slate-100 shadow-xl">
+                              <button
+                                type="button"
+                                onClick={() => handleMenuSelect("analyze", col.id)}
+                                className="block w-full px-3 py-1 text-left hover:bg-slate-800"
+                              >
+                                Analyze
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleMenuSelect("edit-column", col.id)
+                                }
+                                className="block w-full px-3 py-1 text-left hover:bg-slate-800"
+                              >
+                                {editingCol === col.id
+                                  ? "Stop editing"
+                                  : "Edit column"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleMenuSelect("filter", col.id)}
+                                className="block w-full px-3 py-1 text-left hover:bg-slate-800"
+                              >
+                                Filter
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleMenuSelect("sort", col.id)}
+                                className="block w-full px-3 py-1 text-left hover:bg-slate-800"
+                              >
+                                Sort
+                              </button>
+                            </div>
+                          )}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-slate-800 bg-slate-950/60">
+                    {processedRows.map((row) => (
+                      <tr key={row.id} className="hover:bg-slate-900/80">
+                        {COLUMNS.map((col) => {
+                          const isEditing = editingCol === col.id;
+                          const rawValue = (row as any)[col.id];
+
+                          return (
+                            <td
+                              key={col.id}
+                              className="px-3 py-2 text-[11px] text-slate-100 whitespace-nowrap"
+                            >
+                              {isEditing ? (
+                                <input
+                                  className="w-full rounded border border-slate-700 bg-slate-900 px-1 py-0.5 text-[11px] text-slate-100"
+                                  value={String(rawValue ?? "")}
+                                  onChange={(e) => {
+                                    const value = e.target.value;
+                                    setRows((prev) =>
+                                      prev.map((r) =>
+                                        r.id === row.id
+                                          ? { ...r, [col.id]: value }
+                                          : r
+                                      )
+                                    );
+                                  }}
+                                />
+                              ) : (
+                                String(rawValue ?? "")
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+
+                    {!processedRows.length && !loadingRows && (
+                      <tr>
+                        <td
+                          colSpan={COLUMNS.length}
+                          className="px-4 py-10 text-center text-sm text-slate-400"
+                        >
+                          No rows
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="mt-3 px-3 pb-3 flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+                {editingChipLabel && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-800 px-2 py-0.5 text-[10px] text-slate-100">
+                    Editing column:{" "}
+                    <span className="font-mono">{editingChipLabel}</span>
+                  </span>
+                )}
+
+                {activeFilterLabel && filterConfig?.value && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-900/40 px-2 py-0.5 text-[10px] text-emerald-300">
+                    Filter:{" "}
+                    <span className="font-mono">
+                      {activeFilterLabel} ~ "{filterConfig.value}"
+                    </span>
+                    <button
+                      type="button"
+                      onClick={clearFilter}
+                      className="ml-1 text-[10px] underline"
+                    >
+                      clear
+                    </button>
+                  </span>
+                )}
+
+                {activeSortLabel && sortConfig && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-sky-900/40 px-2 py-0.5 text-[10px] text-sky-300">
+                    Sort:{" "}
+                    <span className="font-mono">
+                      {activeSortLabel} ({sortConfig.direction})
+                    </span>
+                  </span>
+                )}
+              </div>
             </div>
-          </div>
-
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
-            {editingChipLabel && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-slate-800 px-2 py-0.5 text-[10px] text-slate-100">
-                Editing column:{" "}
-                <span className="font-mono">{editingChipLabel}</span>
-              </span>
-            )}
-
-            {activeFilterLabel && filterConfig?.value && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-900/40 px-2 py-0.5 text-[10px] text-emerald-300">
-                Filter:{" "}
-                <span className="font-mono">
-                  {activeFilterLabel} ~ "{filterConfig.value}"
-                </span>
-                <button
-                  type="button"
-                  onClick={clearFilter}
-                  className="ml-1 text-[10px] underline"
-                >
-                  clear
-                </button>
-              </span>
-            )}
-
-            {activeSortLabel && sortConfig && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-sky-900/40 px-2 py-0.5 text-[10px] text-sky-300">
-                Sort:{" "}
-                <span className="font-mono">
-                  {activeSortLabel} ({sortConfig.direction})
-                </span>
-              </span>
-            )}
-          </div>
+          )}
         </div>
       </div>
 

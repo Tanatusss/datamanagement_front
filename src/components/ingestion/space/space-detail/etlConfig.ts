@@ -2,6 +2,7 @@
 import type { EtlActionType } from "@/components/ingestion/space/EtlActionIcon";
 
 export const ETL_ACTIONS: EtlActionType[] = [
+  // ===== Common (Core) =====
   "aggregate",
   "conditional",
   "convert",
@@ -15,19 +16,44 @@ export const ETL_ACTIONS: EtlActionType[] = [
   "scd",
   "sort",
   "union",
+
+  // ===== Other Transforms =====
+  "copyColumn",
+  "pivot",
+  "unpivot",
+  "audit",
+  "characterMap",
+  "percentageSampling",
+  "rowSampling",
+  "importColumn",
+  "exportColumn",
+  "fuzzyLookup",
+  "fuzzyGrouping",
 ];
 
 export const ETL_GROUPS: { label: string; actions: EtlActionType[] }[] = [
   {
-    label: "Transform",
-    actions: ["aggregate", "derived", "lookup", "conditional", "sort"],
+    label: "TRANSFORM",
+    actions: ["aggregate", "derived", "lookup", "conditional", "sort", "convert"],
   },
   {
-    label: "Merge & Flow",
+    label: "MERGE & FLOW",
     actions: ["merge", "mergeJoin", "union", "multicast"],
   },
   {
-    label: "Utility",
-    actions: ["convert", "rowCount", "script", "scd"],
+    label: "UTILITY",
+    actions: ["rowCount", "script", "scd"],
+  },
+  {
+    label: "RESHAPE",
+    actions: ["copyColumn", "pivot", "unpivot"],
+  },
+  {
+    label: "DATA QUALITY",
+    actions: ["audit", "characterMap", "fuzzyLookup", "fuzzyGrouping"],
+  },
+  {
+    label: "SAMPLING / COLUMN OPS",
+    actions: ["percentageSampling", "rowSampling", "importColumn", "exportColumn"],
   },
 ];
