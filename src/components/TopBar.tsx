@@ -1,193 +1,132 @@
+// src/components/TopBar.tsx
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import React, { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
-  Search,
+  Menu,
   X,
+  Search,
   ChevronLeft,
   ChevronRight,
-  Menu,
+  Command,
 } from "lucide-react";
+
 import { cn } from "@/lib/cn";
 
-type TopbarProps = {
+type Props = {
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
 };
 
-type OpenedTab = {
-  path: string;
-  label: string;
-};
-
-const SEGMENT_LABEL_MAP: Record<string, string> = {
-  ocr: "OCR",
-  ingestion: "Ingestion",
-  space: "Space",
-  connection: "Connection",
-  catalog: "Data Catalog",
-  apis: "APIs",
-  visualization: "Visualization",
-  governance: "Governance",
-  mdm: "MDM",
-  "mrm-ai": "MRM & AI",
-  marketplace: "Marketplace",
-  sandbox: "AI Sandbox",
-  console: "AI Console",
-  admin: "Admin",
-};
-
-const IGNORE_TABS_PREFIX = ["/login", "/register"];
-
-function pathToLabel(pathname: string): string {
-  if (!pathname || pathname === "/") return "Home";
-
-  const segments = pathname.split("/").filter(Boolean);
-  const last = segments[segments.length - 1];
-
-  if (SEGMENT_LABEL_MAP[last]) return SEGMENT_LABEL_MAP[last];
-  if (SEGMENT_LABEL_MAP[segments[0]]) return SEGMENT_LABEL_MAP[segments[0]];
-
-  const decoded = decodeURIComponent(last);
-  return decoded
-    .replace(/-/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-export default function Topbar({ sidebarOpen, onToggleSidebar }: TopbarProps) {
-  const pathname = usePathname();
+export default function Topbar({ sidebarOpen, onToggleSidebar }: Props) {
   const router = useRouter();
 
-  const [tabs, setTabs] = useState<OpenedTab[]>([]);
   const [q, setQ] = useState("");
+  const [kHint, setKHint] = useState<"Cmd" | "Ctrl">("Ctrl");
 
-  // add tab on route change
   useEffect(() => {
-    if (!pathname) return;
-    if (IGNORE_TABS_PREFIX.some((p) => pathname.startsWith(p))) return;
+    const isMac =
+      typeof navigator !== "undefined" &&
+      /Mac|iPhone|iPad|iPod/i.test(navigator.platform);
+    setKHint(isMac ? "Cmd" : "Ctrl");
+  }, []);
 
-    setTabs((prev) => {
-      if (prev.some((t) => t.path === pathname)) return prev;
-      return [...prev, { path: pathname, label: pathToLabel(pathname) }];
-    });
-  }, [pathname]);
+  const shell =
+    "w-full border-b border-slate-800/70 bg-[#0D1117]/80 backdrop-blur supports-[backdrop-filter]:bg-[#0D1117]/70";
 
-  const handleCloseTab = useCallback(
-    (pathToClose: string) => {
-      let next: string | null = null;
-
-      setTabs((prev) => {
-        const idx = prev.findIndex((t) => t.path === pathToClose);
-        const nextTabs = prev.filter((t) => t.path !== pathToClose);
-
-        if (pathname === pathToClose) {
-          next = nextTabs[idx - 1]?.path ?? nextTabs[0]?.path ?? "/";
-        }
-        return nextTabs;
-      });
-
-      if (next) router.push(next);
-    },
-    [router, pathname]
+  const iconBtn = cn(
+    "inline-flex h-9 w-9 items-center justify-center rounded-md",
+    "border border-slate-700/70 bg-[#0B1220]/60",
+    "text-slate-200 hover:bg-slate-800/60 hover:text-slate-100",
+    "transition-colors"
   );
 
+  // ✅ ต้องเป็น xl:hidden (ไม่ใช่ lg:hidden) เพราะ drawer ใช้ xl เป็น breakpoint
+  const hamburgerBtn = cn(
+    "xl:hidden inline-flex h-9 w-9 items-center justify-center rounded-md",
+    "border border-slate-700/70 bg-[#0B1220]/60",
+    "text-slate-200 hover:bg-slate-800/60 hover:text-slate-100",
+    "transition-colors"
+  );
+
+  const searchWrap = cn(
+    "flex w-full items-center gap-2 rounded-md",
+    "border border-slate-700/70 bg-[#020617]/55",
+    "px-3 py-2",
+    "transition-colors",
+    "focus-within:border-sky-500/60 focus-within:ring-2 focus-within:ring-sky-500/15"
+  );
+
+  const searchInput = cn(
+    "w-full bg-transparent outline-none",
+    "text-slate-200 placeholder:text-slate-500",
+    "text-sm"
+  );
+
+  const canGoBack = useMemo(() => true, []);
+  const canGoForward = useMemo(() => true, []);
+
   return (
-    <header className="w-full border-b border-slate-800 bg-[#06070A]">
-      {/* ───────────────── Top row */}
-      <div className="flex items-center gap-3 px-3 py-2 lg:px-4">
-        {/* ☰ Hamburger (mobile / tablet) */}
+    <header className={shell}>
+      <div className="flex h-14 items-center gap-2 px-3 lg:px-4">
+        {/* ☰ Hamburger (< xl เท่านั้น) */}
         <button
           type="button"
           onClick={onToggleSidebar}
-          className="lg:hidden flex h-9 w-9 items-center justify-center rounded-md
-                     border border-slate-700 bg-[#020617] text-slate-200
-                     hover:bg-[#111827]"
+          className={hamburgerBtn}
+          aria-label={sidebarOpen ? "Close menu" : "Open menu"}
+          title={sidebarOpen ? "Close menu" : "Open menu"}
         >
           {sidebarOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
         </button>
 
-        {/* ◀ ▶ Back / Forward (desktop only, อยู่ข้าง search) */}
-        <div className="hidden lg:flex  items-center gap-1">
+        {/* ⬅ ➡ Back / Forward
+            - บนจอเล็กมากให้ซ่อน forward เพื่อไม่ทับ search
+        */}
+        <div className="flex items-center gap-1">
           <button
+            type="button"
+            className={cn(iconBtn, !canGoBack && "opacity-50 pointer-events-none")}
             onClick={() => router.back()}
-            className="h-9 w-9 flex items-center justify-center rounded-md
-                       border border-slate-700 bg-[#020617] text-slate-200
-                       hover:bg-[#111827]"
             title="Back"
+            aria-label="Back"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
+
           <button
+            type="button"
+            className={cn(
+              iconBtn,
+              "hidden sm:inline-flex",
+              !canGoForward && "opacity-50 pointer-events-none"
+            )}
             onClick={() => router.forward()}
-            className="h-9 w-9 flex items-center justify-center rounded-md
-                       border border-slate-700 bg-[#020617] text-slate-200
-                       hover:bg-[#111827]"
             title="Forward"
+            aria-label="Forward"
           >
             <ChevronRight className="h-4 w-4" />
           </button>
         </div>
 
-        {/* 🔍 Search (layout เดิม) */}
-        <div className="relative flex flex-1 max-w-xl">
-          <div
-            className="flex w-full items-center gap-2 rounded-md
-                       border border-slate-700 bg-[#020617]
-                       px-3 py-2 text-xs text-slate-400"
-          >
-            <Search className="h-4 w-4" />
+        {/* Search */}
+        <div className="relative flex-1 min-w-0">
+          <div className={searchWrap}>
+            <Search className="h-4 w-4 text-slate-400 shrink-0" />
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Search pages… (Ctrl/Cmd+K)"
-              className="w-full bg-transparent outline-none
-                         text-slate-200 placeholder:text-slate-500"
+              placeholder="Search pages…"
+              className={searchInput}
             />
-            {q && (
-              <button
-                onClick={() => setQ("")}
-                className="h-6 w-6 flex items-center justify-center
-                           rounded hover:bg-slate-700/40"
-              >
-                <X className="h-4 w-4 text-slate-400" />
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
 
-      {/* ───────────────── Tabs row (เหมือนเดิม) */}
-      <div className="flex items-end border-t border-slate-900 px-1 pt-1">
-        <div className="flex max-w-full flex-1 overflow-x-auto">
-          {tabs.map((tab) => {
-            const active = tab.path === pathname;
-            return (
-              <div
-                key={tab.path}
-                onClick={() => router.push(tab.path)}
-                className={cn(
-                  "group flex items-center px-3 py-1.5 text-xs rounded-t-md border border-b-0 mr-[2px]",
-                  active
-                    ? "bg-[#0b1120] text-[#F0EEE9] border-slate-700"
-                    : "bg-[#020617] text-slate-400 border-transparent hover:bg-[#050816]"
-                )}
-              >
-                <span className="truncate max-w-[160px]">{tab.label}</span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleCloseTab(tab.path);
-                  }}
-                  className="ml-2 h-4 w-4 flex items-center justify-center
-                             rounded hover:bg-slate-600/40"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
-            );
-          })}
-          <div className="flex-1 border-b border-slate-800" />
+            {/* Hint (ซ่อนในจอเล็ก) */}
+            <div className="hidden md:flex items-center gap-1 text-[11px] text-slate-500 shrink-0">
+              <Command className="h-3.5 w-3.5" />
+              <span>{kHint}+K</span>
+            </div>
+          </div>
         </div>
       </div>
     </header>

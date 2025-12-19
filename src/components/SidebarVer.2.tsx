@@ -111,10 +111,14 @@ export default function SidebarVer2({
   footer,
   sidebarOpen,
   onToggleSidebar,
+  onCloseSidebar,
+  onOpenSidebar
 }: {
   children: React.ReactNode;
   header?: React.ReactNode;
   footer?: React.ReactNode;
+  onCloseSidebar?: () => void;
+  onOpenSidebar?: () => void;
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
 }) {
@@ -151,6 +155,7 @@ export default function SidebarVer2({
     else setActiveSection(null);
   }, [pathname]);
 
+  // ใช้สำหรับ “desktop collapse” เท่านั้น (xl+)
   const collapsed = !sidebarOpen;
 
   const isActiveRoute = (href: string) =>
@@ -166,11 +171,15 @@ export default function SidebarVer2({
   }, [activeSection]);
 
   const closeDrawerIfMobile = () => {
-    // ✅ ครอบ iPad mini ด้วย (ก่อน xl)
     if (window.matchMedia && window.matchMedia("(max-width: 1279px)").matches) {
-      if (sidebarOpen) onToggleSidebar();
+      if (sidebarOpen) {
+        // ✅ ปิดแบบชัวร์ (ไม่ toggle)
+        if (onCloseSidebar) onCloseSidebar();
+        else onToggleSidebar();
+      }
     }
   };
+
 
   const handleCreateSpace = (name: string) => {
     createSpace(name);
@@ -265,7 +274,7 @@ export default function SidebarVer2({
                   "w-full rounded-lg px-3 py-2 text-left",
                   "transition-colors duration-150",
                   pathname?.startsWith("/ingestion/space") &&
-                  pathname.includes(encodeURIComponent(s.name))
+                    pathname.includes(encodeURIComponent(s.name))
                     ? "bg-[#141824] text-[#F0EEE9]"
                     : "text-[#F0EEE9B3] hover:bg-[#141824] hover:text-[#F0EEE9]",
                 ].join(" ")}
@@ -323,7 +332,7 @@ export default function SidebarVer2({
                   "w-full rounded-lg px-3 py-2 text-left",
                   "transition-colors duration-150",
                   pathname?.startsWith("/ingestion/connection") &&
-                  pathname.includes(encodeURIComponent(c.id))
+                    pathname.includes(encodeURIComponent(c.id))
                     ? "bg-[#141824] text-[#F0EEE9]"
                     : "text-[#F0EEE9B3] hover:bg-[#141824] hover:text-[#F0EEE9]",
                 ].join(" ")}
@@ -376,7 +385,7 @@ export default function SidebarVer2({
     if (!sidebarOpen) return null;
 
     return (
-      <div className="xl:hidden fixed inset-0 z-[80]">
+      <div className="xl:hidden fixed inset-0 z-[300]">
         <button
           type="button"
           aria-label="Close menu"
@@ -552,10 +561,11 @@ export default function SidebarVer2({
 
   return (
     <div className="relative flex h-dvh w-full bg-[#020617] text-[#F0EEE9]">
+      {/* ✅ Mobile drawer (render แยก แต่ไม่ซ้ำ children) */}
       <MobileDrawer />
 
-      {/* ✅ Desktop layout: xl+ */}
-      <div className="hidden xl:flex h-full w-full">
+      {/* ✅ Desktop sidebar (xl+ เท่านั้น) */}
+      <div className="hidden xl:flex h-full">
         <aside className="flex h-full w-16 flex-col items-center justify-between bg-[#06070A] text-[#F0EEE9B3]">
           <div className="mt-3 flex flex-col items-center gap-4">
             <button
@@ -582,7 +592,11 @@ export default function SidebarVer2({
                       setActiveSection((prev) =>
                         prev === sec.key && !collapsed ? null : sec.key
                       );
-                      if (collapsed) onToggleSidebar();
+                      if (collapsed) {
+                        if (onOpenSidebar) onOpenSidebar();
+                        else onToggleSidebar();
+                      }
+
                     }}
                     className={[
                       "group relative flex h-10 w-10 items-center justify-center rounded-xl",
@@ -767,38 +781,22 @@ export default function SidebarVer2({
             <ChevronRight className="h-4 w-4" />
           </button>
         )}
-
-        <main className="relative z-0 flex min-h-0 flex-1 flex-col bg-[#0D1117] text-[#F0EEE9]">
-          {header && (
-            <div className="shrink-0 border-b border-slate-800">{header}</div>
-          )}
-          <div className="min-h-0 flex-1 overflow-auto">{children}</div>
-          {footer && (
-            <div className="shrink-0 border-t border-slate-800 bg-[#050812]">
-              {footer}
-            </div>
-          )}
-        </main>
       </div>
 
-      {/* ✅ Mobile/Tablet: < xl (รวม iPad mini) */}
-      <div className="xl:hidden flex h-full w-full">
-        <main className="relative flex min-h-0 flex-1 flex-col bg-[#0D1117] text-[#F0EEE9]">
-          {header && (
-            <div className="shrink-0 border-b border-slate-800">{header}</div>
-          )}
+      {/* ✅ MAIN ตัวเดียวทุก breakpoint (ไม่ทำให้ state reset ตอน resize) */}
+      <main className="relative z-0 flex min-h-0 flex-1 flex-col bg-[#0D1117] text-[#F0EEE9]">
+        {header && <div className="shrink-0 border-b border-slate-800">{header}</div>}
 
-          {/* ✅ content scroll + เผื่อพื้นที่ให้ bottom bar */}
-          <div className="min-h-0 flex-1 overflow-auto pb-14">{children}</div>
+        <div className="min-h-0 flex-1 overflow-auto pb-20 xl:pb-0">
+          {children}
+        </div>
 
-          {/* ✅ footer ชั้นเดียว (fixed) */}
-          {footer && (
-            <div className="fixed inset-x-0 bottom-0 z-[99999] border-t border-slate-800 bg-[#050812]">
-              {footer}
-            </div>
-          )}
-        </main>
-      </div>
+        {footer && (
+          <div className="border-t border-slate-800 bg-[#050812] fixed inset-x-0 bottom-0 z-[99999] xl:static">
+            {footer}
+          </div>
+        )}
+      </main>
 
       <CreateSpaceModal
         open={spaceModalOpen}

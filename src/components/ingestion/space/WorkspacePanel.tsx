@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from "react";
 import { CheckCircle2, Copy, FileJson, FileText, AlertTriangle } from "lucide-react";
 import JsonSchemaPanel from "./transform/JsonSchemaPanel";
-import { WorkspaceNode } from "@/components/ingestion/space/WorkspaceNode";
+
 
 type WorkspaceMode = "transform" | "sql";
 

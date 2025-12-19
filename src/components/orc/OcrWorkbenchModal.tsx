@@ -1,12 +1,7 @@
 // src/components/orc/OcrWorkbenchModal.tsx
 "use client";
 
-import React, {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   FileImage,
   FileText,
@@ -40,6 +35,7 @@ import { AiPanel } from "./AiPanel";
 
 import { getPdfPageCount } from "./pdfUtils";
 import { PdfCanvasViewer } from "./PdfCanvasViewer";
+import { createPortal } from "react-dom";
 
 /* ---------- mock OCR ---------- */
 async function mockOcr(file: File): Promise<OcrResult> {
@@ -96,11 +92,9 @@ export function OcrWorkbenchModal({ isOpen, file, onClose }: Props) {
   const [editingLineId, setEditingLineId] = useState<string | null>(null);
 
   // panel: OCR / Crop / AI
-  const [activePanel, setActivePanel] =
-    useState<"ocr" | "crop" | "ai">("ocr");
+  const [activePanel, setActivePanel] = useState<"ocr" | "crop" | "ai">("ocr");
   const [isCropMode, setIsCropMode] = useState(false);
-  const [highlightedLineId, setHighlightedLineId] =
-    useState<string | null>(null);
+  const [highlightedLineId, setHighlightedLineId] = useState<string | null>(null);
   const [cropFocusOnly] = useState(false);
   const [viewMode, setViewMode] = useState<"all" | "crop">("all");
   const [isCropping, setIsCropping] = useState(false);
@@ -111,9 +105,7 @@ export function OcrWorkbenchModal({ isOpen, file, onClose }: Props) {
     h: number;
   } | null>(null);
 
-  const [resizingCropId, setResizingCropId] = useState<string | null>(
-    null
-  );
+  const [resizingCropId, setResizingCropId] = useState<string | null>(null);
   const resizeInfoRef = useRef<{
     startX: number;
     startY: number;
@@ -123,16 +115,15 @@ export function OcrWorkbenchModal({ isOpen, file, onClose }: Props) {
   const [aiRows, setAiRows] = useState<AiRow[]>([]);
   const previewRef = useRef<HTMLDivElement | null>(null);
 
-  const [ocrViewStep, setOcrViewStep] =
-    useState<OcrViewStep>("account");
-  const [statementStatus, setStatementStatus] =
-    useState<StatementStatus>("reviewing");
+  const [ocrViewStep, setOcrViewStep] = useState<OcrViewStep>("account");
+  const [statementStatus, setStatementStatus] = useState<StatementStatus>("reviewing");
 
-  const [accountDetails, setAccountDetails] =
-    useState<AccountDetails | null>(null);
-  const [transactions, setTransactions] = useState<TransactionRow[]>(
-    []
-  );
+  const [accountDetails, setAccountDetails] = useState<AccountDetails | null>(null);
+  const [transactions, setTransactions] = useState<TransactionRow[]>([]);
+
+  // ✅ กัน hydration/portal issue
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   // ---------- helper: เคลียร์ state + ลบ lines ที่ครอป ----------
   const resetCropStateAndRemoveLines = useCallback(() => {
@@ -146,10 +137,7 @@ export function OcrWorkbenchModal({ isOpen, file, onClose }: Props) {
 
     setResult((prev) =>
       prev
-        ? {
-          ...prev,
-          lines: prev.lines.filter((l) => l.source !== "crop"),
-        }
+        ? { ...prev, lines: prev.lines.filter((l) => l.source !== "crop") }
         : prev
     );
   }, []);
@@ -170,23 +158,19 @@ export function OcrWorkbenchModal({ isOpen, file, onClose }: Props) {
     setStatementStatus("reviewing");
 
     try {
-      const isPdfFile =
-        isPdf(f.type || "") || f.name.toLowerCase().endsWith(".pdf");
+      const isPdfFile = isPdf(f.type || "") || f.name.toLowerCase().endsWith(".pdf");
 
       const [ocrResult, pageCount] = await Promise.all([
         mockOcr(f),
         isPdfFile
           ? getPdfPageCount(f).catch((err) => {
-            console.error("[loadFile] getPdfPageCount error", err);
-            return 1;
-          })
+              console.error("[loadFile] getPdfPageCount error", err);
+              return 1;
+            })
           : Promise.resolve(1),
       ]);
 
-      const merged: OcrResult = {
-        ...ocrResult,
-        pages: pageCount,
-      };
+      const merged: OcrResult = { ...ocrResult, pages: pageCount };
 
       setResult(merged);
       setCurrentPage(1);
@@ -219,7 +203,6 @@ export function OcrWorkbenchModal({ isOpen, file, onClose }: Props) {
   const ensureAiRows = useCallback(() => {
     setAiRows((prev) => {
       if (prev.length) return prev;
-
       return [
         { id: uid(), label: "ธนาคาร", text: "" },
         { id: uid(), label: "เลขที่อ้างอิง", text: "" },
@@ -234,9 +217,7 @@ export function OcrWorkbenchModal({ isOpen, file, onClose }: Props) {
       if (!prev) return prev;
       return {
         ...prev,
-        lines: prev.lines.map((l) =>
-          l.id === id ? { ...l, ...patch } : l
-        ),
+        lines: prev.lines.map((l) => (l.id === id ? { ...l, ...patch } : l)),
       };
     });
   };
@@ -263,9 +244,7 @@ export function OcrWorkbenchModal({ isOpen, file, onClose }: Props) {
   const copyAll = useCallback(() => {
     if (activePanel === "ai") {
       if (!aiRows.length) return;
-      const text = aiRows
-        .map((r) => `${r.label}: ${r.text}`)
-        .join("\n");
+      const text = aiRows.map((r) => `${r.label}: ${r.text}`).join("\n");
       navigator.clipboard.writeText(text);
       return;
     }
@@ -288,14 +267,7 @@ export function OcrWorkbenchModal({ isOpen, file, onClose }: Props) {
       if (ocrViewStep === "transactions" && transactions.length) {
         const header = "No.,Date,Debit,Credit,Balance,Description";
         const rows = transactions.map((t) =>
-          [
-            t.id,
-            t.date,
-            t.debit.toFixed(2),
-            t.credit.toFixed(2),
-            t.balance.toFixed(2),
-            t.description,
-          ].join(",")
+          [t.id, t.date, t.debit.toFixed(2), t.credit.toFixed(2), t.balance.toFixed(2), t.description].join(",")
         );
         navigator.clipboard.writeText([header, ...rows].join("\n"));
         return;
@@ -311,14 +283,7 @@ export function OcrWorkbenchModal({ isOpen, file, onClose }: Props) {
 
     const text = src.map((l) => `${l.label}: ${l.text}`).join("\n");
     navigator.clipboard.writeText(text);
-  }, [
-    activePanel,
-    aiRows,
-    accountDetails,
-    transactions,
-    ocrViewStep,
-    result,
-  ]);
+  }, [activePanel, aiRows, accountDetails, transactions, ocrViewStep, result]);
 
   // -------- crop handlers --------
   const handleCropMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -352,20 +317,11 @@ export function OcrWorkbenchModal({ isOpen, file, onClose }: Props) {
       setResult((prev) =>
         prev
           ? {
-            ...prev,
-            lines: prev.lines.map((l) =>
-              l.id === resizingCropId && l.bbox
-                ? {
-                  ...l,
-                  bbox: {
-                    ...l.bbox,
-                    w: newW,
-                    h: newH,
-                  },
-                }
-                : l
-            ),
-          }
+              ...prev,
+              lines: prev.lines.map((l) =>
+                l.id === resizingCropId && l.bbox ? { ...l, bbox: { ...l.bbox, w: newW, h: newH } } : l
+              ),
+            }
           : prev
       );
       return;
@@ -376,12 +332,7 @@ export function OcrWorkbenchModal({ isOpen, file, onClose }: Props) {
     const currentX = e.clientX - rect.left;
     const currentY = e.clientY - rect.top;
 
-    setCropRect({
-      x: cropRect.x,
-      y: cropRect.y,
-      w: currentX - cropRect.x,
-      h: currentY - cropRect.y,
-    });
+    setCropRect({ x: cropRect.x, y: cropRect.y, w: currentX - cropRect.x, h: currentY - cropRect.y });
   };
 
   const finalizeCrop = () => {
@@ -423,9 +374,7 @@ export function OcrWorkbenchModal({ isOpen, file, onClose }: Props) {
       source: "crop" as const,
     }));
 
-    setResult((prev) =>
-      prev ? { ...prev, lines: [...prev.lines, ...newLines] } : prev
-    );
+    setResult((prev) => (prev ? { ...prev, lines: [...prev.lines, ...newLines] } : prev));
 
     setHighlightedLineId(newLines[0].id);
     setViewMode("crop");
@@ -453,21 +402,14 @@ export function OcrWorkbenchModal({ isOpen, file, onClose }: Props) {
     finalizeCrop();
   };
 
-  const handleResizeHandleMouseDown = (
-    e: React.MouseEvent<HTMLDivElement>,
-    line: OcrLine
-  ) => {
+  const handleResizeHandleMouseDown = (e: React.MouseEvent<HTMLDivElement>, line: OcrLine) => {
     e.stopPropagation();
     if (!previewRef.current || !line.bbox) return;
 
     const startX = e.clientX;
     const startY = e.clientY;
 
-    resizeInfoRef.current = {
-      startX,
-      startY,
-      orig: { ...line.bbox },
-    };
+    resizeInfoRef.current = { startX, startY, orig: { ...line.bbox } };
     setResizingCropId(line.id);
     setHighlightedLineId(line.id);
   };
@@ -521,24 +463,22 @@ export function OcrWorkbenchModal({ isOpen, file, onClose }: Props) {
       case "approved":
         return "bg-emerald-900/40 text-emerald-200 border-emerald-700";
       default:
-        return "bg-[#3C3C3C]] text-[#F0EEE9B3] border-[#3C3C3C]";
+        return "bg-[#3C3C3C] text-[#F0EEE9B3] border-[#3C3C3C]";
     }
   })();
 
   if (!isOpen || !file) return null;
+  if (!mounted) return null;
 
-  const isPdfFile =
-    isPdf(file.type || "") || file.name.toLowerCase().endsWith(".pdf");
+  const isPdfFile = isPdf(file.type || "") || file.name.toLowerCase().endsWith(".pdf");
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-      {/* modal wrapper – VS Code dark */}
+  return createPortal(
+    <div className="fixed inset-0 z-[2147483647] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+      {/* modal wrapper */}
       <div className="mx-4 flex w-full max-w-7xl max-h-[90vh] flex-col rounded-3xl border border-[#3C3C3C] bg-[#1E1E1E] shadow-2xl text-[#F0EEE9]">
         {/* header modal */}
         <div className="flex items-center justify-between border-b border-[#3C3C3C] bg-[#252526] px-6 py-4">
-          <h2 className="text-lg font-semibold text-[#F0EEE9]">
-            OCR Workbench
-          </h2>
+          <h2 className="text-lg font-semibold text-[#F0EEE9]">OCR Workbench</h2>
           <button
             onClick={() => {
               resetCropStateAndRemoveLines();
@@ -569,20 +509,22 @@ export function OcrWorkbenchModal({ isOpen, file, onClose }: Props) {
                 <button
                   type="button"
                   onClick={() => setStatementStatus("unapproved")}
-                  className={`inline-flex items-center rounded-full border px-3 py-1 text-[11px] sm:text-xs ${statementStatus === "unapproved"
+                  className={`inline-flex items-center rounded-full border px-3 py-1 text-[11px] sm:text-xs ${
+                    statementStatus === "unapproved"
                       ? "border-amber-500 bg-amber-900/50 text-amber-200"
                       : "border-[#3C3C3C] bg-[#1E1E1E] text-[#F0EEE9B3] hover:bg-[#2D2D2D]"
-                    }`}
+                  }`}
                 >
                   Unapproved
                 </button>
                 <button
                   type="button"
                   onClick={() => setStatementStatus("approved")}
-                  className={`inline-flex items-center rounded-full border px-3 py-1 text-[11px] sm:text-xs ${statementStatus === "approved"
+                  className={`inline-flex items-center rounded-full border px-3 py-1 text-[11px] sm:text-xs ${
+                    statementStatus === "approved"
                       ? "border-emerald-500 bg-emerald-900/50 text-emerald-200"
                       : "border-[#3C3C3C] bg-[#1E1E1E] text-[#F0EEE9B3] hover:bg-[#2D2D2D]"
-                    }`}
+                  }`}
                 >
                   Approved
                 </button>
@@ -590,10 +532,13 @@ export function OcrWorkbenchModal({ isOpen, file, onClose }: Props) {
             </div>
           </div>
 
-          {/* main layout */}
-          <div className="grid flex-1 min-h-0 grid-cols-12 gap-4">
-            {/* LEFT: preview */}
-            <div className="col-span-12 lg:col-span-7 min-h-0">
+          {/* ✅ Responsive layout
+              - mobile/iPad: Preview (รูป) ขึ้นก่อน
+              - desktop: ซ้ายเป็นรูป ขวาเป็น panel เหมือนเดิม
+          */}
+          <div className="grid flex-1 min-h-0 grid-cols-1 gap-4 lg:grid-cols-12">
+            {/* LEFT: preview (mobile first) */}
+            <div className="order-1 col-span-1 min-h-0 lg:order-1 lg:col-span-7">
               <div className="flex h-full min-h-0 items-center justify-center rounded-[24px] border border-[#3C3C3C] bg-[#252526] overflow-hidden">
                 {!objectUrl ? (
                   <div className="flex flex-col items-center px-6 py-10 text-center text-sm text-[#F0EEE9B3]">
@@ -611,22 +556,14 @@ export function OcrWorkbenchModal({ isOpen, file, onClose }: Props) {
                         ) : (
                           <FileType className="h-4 w-4 text-[#F0EEE9B3]" />
                         )}
-                        <span className="max-w-[200px] truncate">
-                          {file.name}
-                        </span>
+                        <span className="max-w-[200px] truncate">{file.name}</span>
                         <span>• {bytesToPretty(file.size)}</span>
                         {result && <span>• {result.pages} หน้า</span>}
-                        {isLoading && (
-                          <span className="ml-1 text-[#F0EEE9B3]">
-                            กำลังประมวลผล OCR...
-                          </span>
-                        )}
+                        {isLoading && <span className="ml-1 text-[#F0EEE9B3]">กำลังประมวลผล OCR...</span>}
                       </div>
 
                       <button
-                        onClick={() =>
-                          setIsPreviewExpanded((prev) => !prev)
-                        }
+                        onClick={() => setIsPreviewExpanded((prev) => !prev)}
                         className="inline-flex items-center gap-1 rounded-full border border-[#3C3C3C] bg-[#333333] px-3 py-1 text-[#F0EEE9B3] hover:bg-[#444444]"
                       >
                         {isPreviewExpanded ? (
@@ -645,15 +582,13 @@ export function OcrWorkbenchModal({ isOpen, file, onClose }: Props) {
 
                     {/* preview */}
                     <div
-                      className={`bg-[#1E1E1E] transition-all ${isPreviewExpanded
-                          ? "h-[70vh] overflow-auto"
-                          : "h-[280px] overflow-hidden"
-                        } dark-scrollbar`}
+                      className={`bg-[#1E1E1E] transition-all dark-scrollbar ${
+                        isPreviewExpanded
+                          ? "h-[45dvh] overflow-auto lg:h-[70vh]"
+                          : "h-[220px] overflow-hidden lg:h-[280px]"
+                      }`}
                     >
-                      <div
-                        ref={previewRef}
-                        className="relative flex h-full w-full items-start justify-center p-3"
-                      >
+                      <div ref={previewRef} className="relative flex h-full w-full items-start justify-center p-3">
                         {isImage(file.type) && (
                           <img
                             src={objectUrl}
@@ -671,17 +606,15 @@ export function OcrWorkbenchModal({ isOpen, file, onClose }: Props) {
                         {isPdfFile && (
                           <>
                             {!isCropMode && (
-                              <embed
+                              <iframe
                                 key={currentPage}
-                                src={`${objectUrl}#page=${currentPage}`}
-                                type="application/pdf"
+                                src={`${objectUrl}#page=${currentPage}&view=FitH&toolbar=0&navpanes=0&scrollbar=0`}
                                 className="h-full w-full rounded-xl bg-white shadow-xl"
+                                title="pdf-preview"
                               />
                             )}
 
-                            {isCropMode && (
-                              <PdfCanvasViewer file={file} page={currentPage} />
-                            )}
+                            {isCropMode && <PdfCanvasViewer file={file} page={currentPage} />}
                           </>
                         )}
 
@@ -689,10 +622,7 @@ export function OcrWorkbenchModal({ isOpen, file, onClose }: Props) {
                         <div
                           className="absolute inset-0"
                           style={{
-                            pointerEvents:
-                              isCropMode || isCropping || resizingCropId
-                                ? "auto"
-                                : "none",
+                            pointerEvents: isCropMode || isCropping || resizingCropId ? "auto" : "none",
                           }}
                           onMouseDown={handleCropMouseDown}
                           onMouseMove={handleCropMouseMove}
@@ -705,20 +635,19 @@ export function OcrWorkbenchModal({ isOpen, file, onClose }: Props) {
                                 (l) =>
                                   l.source === "crop" &&
                                   l.bbox &&
-                                  (!cropFocusOnly ||
-                                    l.id === highlightedLineId)
+                                  (!cropFocusOnly || l.id === highlightedLineId)
                               )
                               .map((line) => {
                                 const { x, y, w, h } = line.bbox!;
-                                const isActive =
-                                  highlightedLineId === line.id;
+                                const isActive = highlightedLineId === line.id;
                                 return (
                                   <div
                                     key={line.id}
-                                    className={`absolute rounded-md border shadow-sm transition ${isActive
+                                    className={`absolute rounded-md border shadow-sm transition ${
+                                      isActive
                                         ? "border-[#007ACC] bg-cyan-300/25"
                                         : "border-[#3157E0] bg-cyan-200/10 hover:bg-cyan-200/20"
-                                      }`}
+                                    }`}
                                     style={{
                                       left: `${x}%`,
                                       top: `${y}%`,
@@ -751,12 +680,7 @@ export function OcrWorkbenchModal({ isOpen, file, onClose }: Props) {
 
                                     <div
                                       className="absolute right-0 bottom-0 h-3 w-3 translate-x-1/2 translate-y-1/2 cursor-nwse-resize rounded-full border border-[#007ACC] bg-white shadow"
-                                      onMouseDown={(e) =>
-                                        handleResizeHandleMouseDown(
-                                          e,
-                                          line
-                                        )
-                                      }
+                                      onMouseDown={(e) => handleResizeHandleMouseDown(e, line)}
                                     />
                                   </div>
                                 );
@@ -766,23 +690,15 @@ export function OcrWorkbenchModal({ isOpen, file, onClose }: Props) {
                             <div
                               className="pointer-events-none absolute border-2 border-[#007ACC] bg-cyan-300/20"
                               style={{
-                                left: `${Math.min(
-                                  cropRect.x,
-                                  cropRect.x + cropRect.w
-                                )}px`,
-                                top: `${Math.min(
-                                  cropRect.y,
-                                  cropRect.y + cropRect.h
-                                )}px`,
+                                left: `${Math.min(cropRect.x, cropRect.x + cropRect.w)}px`,
+                                top: `${Math.min(cropRect.y, cropRect.y + cropRect.h)}px`,
                                 width: `${Math.abs(cropRect.w)}px`,
                                 height: `${Math.abs(cropRect.h)}px`,
                               }}
                             />
                           )}
 
-                          {isCropMode && (
-                            <div className="pointer-events-none absolute inset-0 cursor-crosshair" />
-                          )}
+                          {isCropMode && <div className="pointer-events-none absolute inset-0 cursor-crosshair" />}
                         </div>
                       </div>
                     </div>
@@ -791,50 +707,46 @@ export function OcrWorkbenchModal({ isOpen, file, onClose }: Props) {
               </div>
             </div>
 
-            {/* RIGHT: OCR / Crop / AI */}
-            <div className="col-span-12 lg:col-span-5 min-h-0">
+            {/* RIGHT: panel (mobile second) */}
+            <div className="order-2 col-span-1 min-h-0 lg:order-2 lg:col-span-5">
               <div className="flex h-full flex-col rounded-[24px] border border-[#3C3C3C] bg-[#252526]">
                 {/* header tabs */}
                 <div className="flex items-center justify-between border-b border-[#3C3C3C] bg-[#2D2D2D] px-4 pt-3 pb-2">
                   <div className="flex flex-1 items-center gap-2">
                     <LayoutPanelLeft className="h-4 w-4 text-[#F0EEE9]" />
 
-                    <div className="flex rounded-full  p-1 gap-2">
-                      {/* ผลลัพธ์ OCR */}
+                    <div className="flex rounded-full p-1 gap-2">
                       <button
                         onClick={() => {
-                          if (activePanel === "crop" || isCropMode) {
-                            resetCropStateAndRemoveLines();
-                          }
+                          if (activePanel === "crop" || isCropMode) resetCropStateAndRemoveLines();
                           setActivePanel("ocr");
                         }}
-                        className={`rounded-full px-3 py-1.5 text-xs sm:text-sm ${activePanel === "ocr"
+                        className={`rounded-full px-3 py-1.5 text-xs sm:text-sm ${
+                          activePanel === "ocr"
                             ? "border border-[#007ACC] bg-[#333333] text-[#F0EEE9] shadow-sm"
                             : "text-[#F0EEE9B3] border border-[#3C3C3C]"
-                          }`}
+                        }`}
                       >
                         ผลลัพธ์ OCR
                       </button>
-                      {/* AI Generate */}
+
                       <button
                         onClick={() => {
                           if (!result) return;
-                          if (activePanel === "crop" || isCropMode) {
-                            resetCropStateAndRemoveLines();
-                          }
+                          if (activePanel === "crop" || isCropMode) resetCropStateAndRemoveLines();
                           setActivePanel("ai");
                           ensureAiRows();
                         }}
-                        className={`rounded-full px-3 py-1.5 text-xs sm:text-sm ${activePanel === "ai"
+                        className={`rounded-full px-3 py-1.5 text-xs sm:text-sm ${
+                          activePanel === "ai"
                             ? "border border-[#007ACC] bg-[#333333] text-[#F0EEE9] shadow-sm"
                             : "text-[#F0EEE9B3] border border-[#3C3C3C]"
-                          }`}
+                        }`}
                       >
                         AI Generate
                       </button>
                     </div>
 
-                    {/* next / back */}
                     {activePanel === "ocr" && (
                       <div className="ml-auto flex items-center gap-1">
                         <button
@@ -876,9 +788,7 @@ export function OcrWorkbenchModal({ isOpen, file, onClose }: Props) {
                   {activePanel === "ocr" && (
                     <>
                       {!result && isLoading ? (
-                        <div className="p-6 text-sm text-[#F0EEE9B3]">
-                          กำลังโหลดผลลัพธ์ OCR...
-                        </div>
+                        <div className="p-6 text-sm text-[#F0EEE9B3]">กำลังโหลดผลลัพธ์ OCR...</div>
                       ) : !accountDetails ? (
                         <div className="p-6 text-sm text-[#F0EEE9B3]">
                           ยังไม่มีข้อมูล Account Details (ลองโหลดไฟล์อีกครั้ง)
@@ -888,26 +798,14 @@ export function OcrWorkbenchModal({ isOpen, file, onClose }: Props) {
                           {ocrViewStep === "account" ? (
                             <OcrAccountDetailsStep
                               accountDetails={accountDetails}
-                              statementStatus={
-                                statementStatus === "approved"
-                                  ? "approved"
-                                  : "unapproved"
-                              }
-                              onChangeAccountDetails={(nextAccount) =>
-                                setAccountDetails(nextAccount)
-                              }
+                              statementStatus={statementStatus === "approved" ? "approved" : "unapproved"}
+                              onChangeAccountDetails={(nextAccount) => setAccountDetails(nextAccount)}
                             />
                           ) : (
                             <OcrTransactionStep
                               transactions={transactions}
-                              statementStatus={
-                                statementStatus === "approved"
-                                  ? "approved"
-                                  : "unapproved"
-                              }
-                              onBackToAccount={() =>
-                                setOcrViewStep("account")
-                              }
+                              statementStatus={statementStatus === "approved" ? "approved" : "unapproved"}
+                              onBackToAccount={() => setOcrViewStep("account")}
                               currentPage={currentPage}
                               totalPages={result?.pages ?? 1}
                               onChangePage={setCurrentPage}
@@ -924,9 +822,7 @@ export function OcrWorkbenchModal({ isOpen, file, onClose }: Props) {
                       {result ? (
                         <AiPanel aiRows={aiRows} setAiRows={setAiRows} />
                       ) : (
-                        <div className="p-6 text-sm text-[#F0EEE9B3]">
-                          ต้องมีผลลัพธ์ OCR ก่อนจึงจะใช้ AI Generate ได้
-                        </div>
+                        <div className="p-6 text-sm text-[#F0EEE9B3]">ต้องมีผลลัพธ์ OCR ก่อนจึงจะใช้ AI Generate ได้</div>
                       )}
                     </>
                   )}
@@ -946,10 +842,9 @@ export function OcrWorkbenchModal({ isOpen, file, onClose }: Props) {
                       ensureAiRows();
                     }}
                     disabled={!result}
-                    className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-sm bg-[#007ACC] text-[#F0EEE9] hover:bg-[#007ACC]/90 disabled:opacity-50 ${activePanel === "ai"
-                        ? "border-[#007ACC] ring-2 ring-[#1D3559]"
-                        : "border-[#3C3C3C]"
-                      }`}
+                    className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-sm bg-[#007ACC] text-[#F0EEE9] hover:bg-[#007ACC]/90 disabled:opacity-50 ${
+                      activePanel === "ai" ? "border-[#007ACC] ring-2 ring-[#1D3559]" : "border-[#3C3C3C]"
+                    }`}
                   >
                     <Sparkles className="h-4 w-4" />
                     AI Assistance
@@ -959,10 +854,7 @@ export function OcrWorkbenchModal({ isOpen, file, onClose }: Props) {
                   {/*
                   <button
                     onClick={handleToggleCropMode}
-                    disabled={
-                      !result ||
-                      !(isImage(result?.mime || "") || isPdf(result?.mime || ""))
-                    }
+                    disabled={!result || !(isImage(result?.mime || "") || isPdf(result?.mime || ""))}
                     className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-sm bg-[#1E1E1E] text-[#F0EEE9] hover:bg-[#2D2D2D] disabled:opacity-50 ${
                       isCropMode && activePanel === "crop"
                         ? "border-[#00A6DF] ring-2 ring-[#1D3559]"
@@ -979,6 +871,7 @@ export function OcrWorkbenchModal({ isOpen, file, onClose }: Props) {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

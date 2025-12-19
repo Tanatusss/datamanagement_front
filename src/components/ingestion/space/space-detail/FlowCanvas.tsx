@@ -21,7 +21,10 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
-import { WorkspaceNode, type WorkspaceNodeData } from "@/components/ingestion/space/WorkspaceNode";
+import {
+  WorkspaceNode,
+  type WorkspaceNodeData,
+} from "@/components/ingestion/space/WorkspaceNode";
 import { Database, ChevronRight, Plus, Wrench } from "lucide-react";
 
 import {
@@ -42,12 +45,7 @@ import {
 } from "@/components/ingestion/space/EtlActionIcon";
 import { getDbIconForType, type DbType } from "@/components/ingestion/dbCatalog";
 
-import type {
-  NodeTemplate,
-  PalettePanel,
-  AppEdge,
-  AppNode,
-} from "./flowTypes";
+import type { NodeTemplate, PalettePanel, AppEdge, AppNode } from "./flowTypes";
 import { ETL_ACTIONS, ETL_GROUPS } from "./etlConfig";
 
 /** ✅ NodeSpec ที่ WorkspacePanel จะส่งมา */
@@ -69,7 +67,10 @@ type Props = {
 
   /** ✅ ให้ parent ขอ handler ไปใช้ (Workspace กด Generate -> ส่งมาที่นี่) */
   onProvideGenerateHandler?: (
-    fn: (nodes: NodeSpec[], meta?: { mode?: "transform" | "sql"; raw?: string }) => void
+    fn: (
+      nodes: NodeSpec[],
+      meta?: { mode?: "transform" | "sql"; raw?: string }
+    ) => void
   ) => void;
 };
 
@@ -144,7 +145,10 @@ export function FlowCanvas({
 
   // ---------- ✅ Generate nodes from Workspace ----------
   const handleGenerateNodes = useCallback(
-    (specs: NodeSpec[], _meta?: { mode?: "transform" | "sql"; raw?: string }) => {
+    (
+      specs: NodeSpec[],
+      _meta?: { mode?: "transform" | "sql"; raw?: string }
+    ) => {
       const COL_X: Record<NodeSpec["kind"], number> = {
         dataset: 120,
         field: 420,
@@ -327,11 +331,27 @@ export function FlowCanvas({
 
   // ---------- drag helpers ----------
   const handleTemplateDragStart = (templateId: string, e: React.DragEvent) => {
+    // ✅ จอเล็กบางที drag ไม่ติดเพราะ browser ต้องการ "drag image"
+    // ใส่ ghost image โปร่งๆ ช่วยให้เริ่ม drag ได้เสถียรขึ้น
+    try {
+      const img = new Image();
+      img.src =
+        "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'%3E%3C/svg%3E";
+      e.dataTransfer.setDragImage(img, 0, 0);
+    } catch {}
+
     e.dataTransfer.setData("application/templateId", templateId);
     e.dataTransfer.effectAllowed = "move";
   };
 
   const handleEtlDragStart = (action: EtlActionType, e: React.DragEvent) => {
+    try {
+      const img = new Image();
+      img.src =
+        "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'%3E%3C/svg%3E";
+      e.dataTransfer.setDragImage(img, 0, 0);
+    } catch {}
+
     e.dataTransfer.setData("application/etl-action", action);
     e.dataTransfer.setData("text/plain", action);
     e.dataTransfer.effectAllowed = "copyMove";
@@ -587,10 +607,26 @@ export function FlowCanvas({
           <Controls className="reactflow-controls" position="bottom-left" />
         </ReactFlow>
 
-        {/* ✅ Docked Palette (อยู่ใน Flow space จริง ๆ) */}
-        <div className="pointer-events-auto absolute right-4 top-4 z-30 max-h-[calc(100%-32px)]">
+        {/* ✅ Docked Palette (responsive + drag on small screens) */}
+        <div className="pointer-events-auto absolute right-3 top-3 z-30 max-h-[calc(100%-24px)]">
           {paletteOpen ? (
-            <div className="w-[360px] max-w-[calc(100vw-32px)] max-h-[calc(100%-0px)] overflow-hidden rounded-2xl bg-slate-900/95 p-3 text-xs text-slate-100 shadow-xl backdrop-blur-md">
+            <div
+              className={[
+                // ✅ responsive width: ลดตามจอ + ไม่กินพื้นที่ flow เกินไป
+                "w-[360px] max-w-[calc(100%-24px)]",
+                "sm:w-[340px]",
+                "md:w-[360px]",
+                "lg:w-[360px]",
+                "xl:w-[380px]",
+                // ✅ responsive scale: ลดขนาดทั้งแผงให้เข้ากับ flow space
+                "scale-[0.92] sm:scale-[0.94] md:scale-100",
+                "origin-top-right",
+                "max-h-[calc(100%-0px)] overflow-hidden",
+                "rounded-2xl bg-slate-900/95 p-3 text-xs text-slate-100 shadow-xl backdrop-blur-md",
+                // ✅ กัน mobile scroll/gesture มาขัด drag
+                "touch-none select-none",
+              ].join(" ")}
+            >
               {/* header */}
               <div className="mb-2 flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -658,14 +694,29 @@ export function FlowCanvas({
                       {templates.map((t) => {
                         const conn = resolveConnectionById(t.connectionId);
                         const dbType = conn?.type as DbType | undefined;
-                        const dbIcon = dbType ? getDbIconForType(dbType) : undefined;
+                        const dbIcon = dbType
+                          ? getDbIconForType(dbType)
+                          : undefined;
 
                         return (
                           <div
                             key={t.id}
                             draggable
+                            // ✅ iPad/mobile: ต้องกัน pointer event ของระบบ scroll แทรก
+                            onPointerDown={(e) => {
+                              // ป้องกันการ scroll container ทำให้ drag ไม่เริ่ม
+                              e.currentTarget.setPointerCapture?.(
+                                (e as any).pointerId
+                              );
+                            }}
                             onDragStart={(e) => handleTemplateDragStart(t.id, e)}
-                            className="cursor-grab active:cursor-grabbing rounded-xl border border-slate-500/70 bg-slate-800/90 px-3 py-2.5 text-[12px] shadow-sm hover:border-sky-500 hover:bg-slate-700/90 transition-colors"
+                            className={[
+                              "cursor-grab active:cursor-grabbing",
+                              "rounded-xl border border-slate-500/70 bg-slate-800/90 px-3 py-2.5 text-[12px]",
+                              "shadow-sm hover:border-sky-500 hover:bg-slate-700/90 transition-colors",
+                              // ✅ สำคัญ: ถ้า parent มี touch-none ต้องให้ item drag ได้
+                              "touch-none",
+                            ].join(" ")}
                           >
                             <div className="flex items-start gap-2.5">
                               <div className="mt-0.5 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-slate-900/90 ring-1 ring-slate-500/80">
@@ -712,11 +763,13 @@ export function FlowCanvas({
                               draggable
                               onDragStart={(e) => handleEtlDragStart(action, e)}
                               onClick={() => applyActionToSelectedEdge(action)}
-                              className="inline-flex items-center gap-2 rounded-full bg-slate-800/80 px-3 py-2 text-[12px] text-slate-100 hover:bg-slate-700"
+                              className="inline-flex items-center gap-2 rounded-full bg-slate-800/80 px-3 py-2 text-[12px] text-slate-100 hover:bg-slate-700 touch-none"
                               title={getEtlActionLabel(action)}
                             >
                               <EtlActionIcon action={action} compact />
-                              <span className="truncate">{getEtlActionLabel(action)}</span>
+                              <span className="truncate">
+                                {getEtlActionLabel(action)}
+                              </span>
                             </button>
                           ))}
                         </div>
@@ -765,7 +818,9 @@ export function FlowCanvas({
           open={previewOpen}
           onClose={() => setPreviewOpen(false)}
           connectionName={
-            selectedConnectionId ? resolveConnectionName(selectedConnectionId) : undefined
+            selectedConnectionId
+              ? resolveConnectionName(selectedConnectionId)
+              : undefined
           }
           schema={schema || "public"}
           table={table || "sample_table"}
