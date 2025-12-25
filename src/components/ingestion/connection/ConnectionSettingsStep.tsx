@@ -496,7 +496,7 @@ function OracleSettings({
               ))}
             </select>
           </div>
-
+  
           {/* Username / Password */}
           <div className="grid grid-cols-[120px_1fr] items-center gap-2">
             <label className="text-[#9CA3AF]">Username:</label>
@@ -567,9 +567,9 @@ function SqlServerSettings({
 }) {
   const [connectBy, setConnectBy] = useState<"host" | "url">("host");
 
-  const [host, setHost] = useState("localhost");
-  const [port, setPort] = useState("1433");
-  const [database, setDatabase] = useState("master");
+  const [host, setHost] = useState("AnalyticsWorkSP");
+  const [port, setPort] = useState("3000");
+  const [database, setDatabase] = useState("default");
   const [rawJdbc, setRawJdbc] = useState(
     `jdbc:sqlserver://${host}:${port};databaseName=${database}`
   );

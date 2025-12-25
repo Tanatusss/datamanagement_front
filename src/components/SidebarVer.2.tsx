@@ -112,7 +112,7 @@ export default function SidebarVer2({
   sidebarOpen,
   onToggleSidebar,
   onCloseSidebar,
-  onOpenSidebar
+  onOpenSidebar,
 }: {
   children: React.ReactNode;
   header?: React.ReactNode;
@@ -180,7 +180,6 @@ export default function SidebarVer2({
     }
   };
 
-
   const handleCreateSpace = (name: string) => {
     createSpace(name);
     setSpaceModalOpen(false);
@@ -215,145 +214,148 @@ export default function SidebarVer2({
     "group-hover:opacity-100 group-hover:scale-100";
 
   const IngestionBlocks = () => (
-    <>
-      <button
-        type="button"
-        onClick={() => {
-          router.push("/ingestion/dashboard");
-          closeDrawerIfMobile();
-        }}
-        className={[
-          "flex w-full items-center justify-between rounded-lg px-3 py-2",
-          "transition-colors duration-150",
-          isActiveRoute("/ingestion/dashboard")
-            ? "bg-[#141824] text-[#F0EEE9]"
-            : "text-[#F0EEE9B3] hover:bg-[#141824] hover:text-[#F0EEE9]",
-        ].join(" ")}
-      >
-        <span className="text-[13px] font-medium">Dashboard</span>
-        <ChevronRight className="h-4 w-4 text-slate-500" />
-      </button>
+  <>
+    <button
+      type="button"
+      onClick={() => {
+        router.push("/ingestion/dashboard");
+        closeDrawerIfMobile();
+      }}
+      className={[
+        "flex w-full items-center justify-between rounded-lg px-3 py-2",
+        "transition-colors duration-150",
+        isActiveRoute("/ingestion/dashboard")
+          ? "bg-[#141824] text-[#F0EEE9]"
+          : "text-[#F0EEE9B3] hover:bg-[#141824] hover:text-[#F0EEE9]",
+      ].join(" ")}
+    >
+      <span className="text-[13px] font-medium">Dashboard</span>
+      <ChevronRight className="h-4 w-4 text-slate-500" />
+    </button>
 
-      <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3">
-        <div className="flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => {
-              router.push("/ingestion/space");
-              closeDrawerIfMobile();
-            }}
-            className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#F0EEE9B3] hover:text-[#F0EEE9]"
-          >
-            Spaces
-          </button>
+    <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3">
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => {
+            router.push("/ingestion/space");
+            closeDrawerIfMobile();
+          }}
+          className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#F0EEE9B3] hover:text-[#F0EEE9]"
+        >
+          Spaces
+        </button>
 
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setSpaceModalOpen(true);
-            }}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-[#F0EEE9B3] hover:bg-white/10 hover:text-[#F0EEE9] transition"
-            title="Create Space"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setSpaceModalOpen(true);
+          }}
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-[#F0EEE9B3] hover:bg-white/10 hover:text-[#F0EEE9] transition"
+          title="Create Space"
+        >
+          <Plus className="h-4 w-4" />
+        </button>
+      </div>
 
-        <div className="mt-2 space-y-1">
-          {spaces.length > 0 ? (
-            spaces.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => {
-                  openSpaceDetail(s.id);
-                  closeDrawerIfMobile();
-                }}
-                className={[
-                  "w-full rounded-lg px-3 py-2 text-left",
-                  "transition-colors duration-150",
-                  pathname?.startsWith("/ingestion/space") &&
-                    pathname.includes(encodeURIComponent(s.name))
-                    ? "bg-[#141824] text-[#F0EEE9]"
-                    : "text-[#F0EEE9B3] hover:bg-[#141824] hover:text-[#F0EEE9]",
-                ].join(" ")}
-              >
-                <span className="block truncate text-[13px] font-medium">
-                  • {s.name}
+      <div className="mt-2 space-y-1">
+        {spaces.length > 0 ? (
+          spaces.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => {
+                // ✅ ไปหน้า /ingestion/space/<ชื่อspace>
+                router.push(`/ingestion/space/${encodeURIComponent(s.name)}`);
+                closeDrawerIfMobile();
+              }}
+              className={[
+                "w-full rounded-lg px-3 py-2 text-left",
+                "transition-colors duration-150",
+                // ✅ active เมื่ออยู่ใน path ของ space นั้น
+                pathname?.startsWith("/ingestion/space/") &&
+                pathname.includes(encodeURIComponent(s.name))
+                  ? "bg-[#141824] text-[#F0EEE9]"
+                  : "text-[#F0EEE9B3] hover:bg-[#141824] hover:text-[#F0EEE9]",
+              ].join(" ")}
+            >
+              <span className="block truncate text-[13px] font-medium">
+                • {s.name}
+              </span>
+            </button>
+          ))
+        ) : (
+          <div className="rounded-lg px-3 py-2 text-xs text-[#6b7280]">
+            No spaces yet
+          </div>
+        )}
+      </div>
+    </div>
+
+    <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3">
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => {
+            router.push("/ingestion/connection");
+            closeDrawerIfMobile();
+          }}
+          className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#F0EEE9B3] hover:text-[#F0EEE9]"
+        >
+          Connections
+        </button>
+
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            openConnectionCreateModal();
+          }}
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-[#F0EEE9B3] hover:bg-white/10 hover:text-[#F0EEE9] transition"
+          title="Create Connection"
+        >
+          <Plus className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="mt-2 space-y-1">
+        {connections.length > 0 ? (
+          connections.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => {
+                // ✅ ไปหน้า /ingestion/connection (ตามที่บอก)
+                // ถ้าคุณมีหน้า detail แบบ /ingestion/connection/<id> ก็เปลี่ยนเป็นอันนั้นได้
+                router.push(`/ingestion/connection`);
+                closeDrawerIfMobile();
+              }}
+              className={[
+                "w-full rounded-lg px-3 py-2 text-left",
+                "transition-colors duration-150",
+                pathname?.startsWith("/ingestion/connection")
+                  ? "bg-[#141824] text-[#F0EEE9]"
+                  : "text-[#F0EEE9B3] hover:bg-[#141824] hover:text-[#F0EEE9]",
+              ].join(" ")}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate text-[13px] font-medium">
+                  • {c.name}
                 </span>
-              </button>
-            ))
-          ) : (
-            <div className="rounded-lg px-3 py-2 text-xs text-[#6b7280]">
-              No spaces yet
-            </div>
-          )}
-        </div>
+                <ChevronRight className="h-4 w-4 text-slate-500" />
+              </div>
+            </button>
+          ))
+        ) : (
+          <div className="rounded-lg px-3 py-2 text-xs text-[#6b7280]">
+            No connections yet
+          </div>
+        )}
       </div>
-
-      <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3">
-        <div className="flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => {
-              router.push("/ingestion/connection");
-              closeDrawerIfMobile();
-            }}
-            className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#F0EEE9B3] hover:text-[#F0EEE9]"
-          >
-            Connections
-          </button>
-
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              openConnectionCreateModal();
-            }}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-[#F0EEE9B3] hover:bg-white/10 hover:text-[#F0EEE9] transition"
-            title="Create Connection"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="mt-2 space-y-1">
-          {connections.length > 0 ? (
-            connections.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => {
-                  openConnectionDetail(c.id);
-                  closeDrawerIfMobile();
-                }}
-                className={[
-                  "w-full rounded-lg px-3 py-2 text-left",
-                  "transition-colors duration-150",
-                  pathname?.startsWith("/ingestion/connection") &&
-                    pathname.includes(encodeURIComponent(c.id))
-                    ? "bg-[#141824] text-[#F0EEE9]"
-                    : "text-[#F0EEE9B3] hover:bg-[#141824] hover:text-[#F0EEE9]",
-                ].join(" ")}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-[13px] font-medium">
-                    • {c.name}
-                  </span>
-                  <ChevronRight className="h-4 w-4 text-slate-500" />
-                </div>
-              </button>
-            ))
-          ) : (
-            <div className="rounded-lg px-3 py-2 text-xs text-[#6b7280]">
-              No connections yet
-            </div>
-          )}
-        </div>
-      </div>
-    </>
-  );
+    </div>
+  </>
+);
 
   const GenericItems = () => (
     <div className="space-y-1">
@@ -565,8 +567,9 @@ export default function SidebarVer2({
       <MobileDrawer />
 
       {/* ✅ Desktop sidebar (xl+ เท่านั้น) */}
-      <div className="hidden xl:flex h-full">
-        <aside className="flex h-full w-16 flex-col items-center justify-between bg-[#06070A] text-[#F0EEE9B3]">
+      {/* ✅ สำคัญ: shrink-0 เพื่อให้ main ถูกดันมาชิด secondary sidebar ตอนเปิด */}
+      <div className="hidden xl:flex h-full shrink-0">
+        <aside className="flex h-full w-16 shrink-0 flex-col items-center justify-between bg-[#06070A] text-[#F0EEE9B3]">
           <div className="mt-3 flex flex-col items-center gap-4">
             <button
               type="button"
@@ -596,7 +599,6 @@ export default function SidebarVer2({
                         if (onOpenSidebar) onOpenSidebar();
                         else onToggleSidebar();
                       }
-
                     }}
                     className={[
                       "group relative flex h-10 w-10 items-center justify-center rounded-xl",
@@ -719,9 +721,10 @@ export default function SidebarVer2({
           </div>
         </aside>
 
+        {/* ✅ สำคัญ: shrink-0 + overflow-hidden เพื่อให้ตอน w-0 ไม่เหลืออะไรดัน main */}
         <aside
           className={[
-            "relative z-40 pointer-events-auto h-full bg-[#050812] transition-all duration-200",
+            "relative z-40 pointer-events-auto h-full shrink-0 bg-[#050812] transition-all duration-200 overflow-hidden",
             collapsed
               ? "w-0 border-l border-[#12151e]"
               : "w-64 border-r border-[#12151e]",
@@ -784,8 +787,11 @@ export default function SidebarVer2({
       </div>
 
       {/* ✅ MAIN ตัวเดียวทุก breakpoint (ไม่ทำให้ state reset ตอน resize) */}
-      <main className="relative z-0 flex min-h-0 flex-1 flex-col bg-[#0D1117] text-[#F0EEE9]">
-        {header && <div className="shrink-0 border-b border-slate-800">{header}</div>}
+      {/* ✅ สำคัญ: min-w-0 เพื่อให้ flex คำนวณความกว้างและขยับชิด sidebar ได้ถูก */}
+      <main className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col bg-[#0D1117] text-[#F0EEE9]">
+        {header && (
+          <div className="shrink-0 border-b border-slate-800">{header}</div>
+        )}
 
         <div className="min-h-0 flex-1 overflow-auto pb-20 xl:pb-0">
           {children}
