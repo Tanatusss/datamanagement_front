@@ -1,29 +1,24 @@
 "use client";
 
 import React from "react";
-import {
-  Handle,
-  Position,
-  type Node,
-  type NodeProps,
-} from "@xyflow/react";
-import { Database, X as XIcon } from "lucide-react";
+import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
+import { Database, X as XIcon, AlertTriangle } from "lucide-react";
 import { DbType } from "../dbCatalog";
 
 export type FlowNodeData = {
-  kind?: "dataset" | "field" | "source" | "sql_draft";
+  kind?: "dataset" | "field" | "source" | "destination" | "sql_draft";
   payload?: any;
   connectionId?: string;
-  connectionName: string;
-  schema: string;
-  table: string;
+  connectionName?: string;
+  schema?: string;
+  table?: string;
   dbIcon?: string;
   dbType?: DbType;
   onOpen?: () => void;
   onDelete?: () => void;
 };
 
-// ✅ ReactFlow node type
+
 export type FlowNodeType = Node<FlowNodeData, "dbNode">;
 
 export function FlowNode(props: NodeProps<FlowNodeType>) {
@@ -31,16 +26,18 @@ export function FlowNode(props: NodeProps<FlowNodeType>) {
   const d = data;
 
   const hasDbIcon = !!d.dbIcon;
-  const dbLabel = d.dbType
-    ? `${d.dbType} connection`
-    : d.connectionName || "Connection";
+
+  // ✅ configured = มีทั้ง connectionId + schema + table (คุณจะปรับเงื่อนไขได้)
+  const isConfigured = !!(d.connectionId && d.schema && d.table);
+
+  const dbLabel = d.dbType ? `${d.dbType}` : d.connectionName || "Connection";
 
   return (
     <div
       onDoubleClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        d.onOpen?.(); // ✅ เรียกจาก FlowCanvas
+        d.onOpen?.(); // ✅ เปิด modal จาก FlowCanvas
       }}
       className={[
         "group relative",
@@ -54,7 +51,7 @@ export function FlowNode(props: NodeProps<FlowNodeType>) {
         selected ? "ring-2 ring-sky-400/80" : "",
       ].join(" ")}
     >
-      {/* ❌ ปุ่มลบ — กันไม่ให้ไป drag / connect */}
+      {/* ❌ delete */}
       {d.onDelete && (
         <button
           type="button"
@@ -106,16 +103,15 @@ export function FlowNode(props: NodeProps<FlowNodeType>) {
 
       {/* content */}
       <div className="flex flex-col items-center text-center">
-        <div className="mb-2">
+        {/* icon */}
+        <div className="relative mb-2">
           <div
-            className="
-              flex h-14 w-14 items-center justify-center
-              rounded-full
-              bg-gradient-to-br from-slate-700 to-slate-800
-              text-white
-              ring-4 ring-slate-600/40
-              shadow-inner
-            "
+            className={[
+              "flex h-14 w-14 items-center justify-center rounded-full",
+              "bg-gradient-to-br from-slate-700 to-slate-800 text-white",
+              "ring-4 ring-slate-600/40 shadow-inner",
+              !isConfigured ? "ring-rose-500/35" : "",
+            ].join(" ")}
             title={dbLabel}
           >
             {hasDbIcon ? (
@@ -129,14 +125,41 @@ export function FlowNode(props: NodeProps<FlowNodeType>) {
               <Database className="h-6 w-6" />
             )}
           </div>
+
+          {/* ✅ red warning badge when not configured */}
+          {!isConfigured && (
+            <div
+              className="
+                absolute -right-1 -top-1
+                flex h-6 w-6 items-center justify-center
+                rounded-full bg-rose-600 text-white
+                ring-2 ring-slate-900
+              "
+              title="Not configured"
+            >
+              <AlertTriangle className="h-3.5 w-3.5" />
+            </div>
+          )}
         </div>
 
-        <p className="mt-1 max-w-full truncate font-mono text-[11px] text-slate-400">
-          Schema: {d.schema || "public"}
-        </p>
-        <p className="mt-0.5 max-w-full truncate font-mono text-xs font-semibold text-white">
-          Table: {d.table || "(table)"}
-        </p>
+        {/* ✅ state: not configured */}
+        {!isConfigured ? (
+          <>
+            <p className="text-[12px] font-semibold text-slate-100">
+              Not configured
+            </p>
+            <p className="mt-0.5 text-[11px] text-rose-300">
+              Double-click to configure
+            </p>
+          </>
+        ) : (
+          /* ✅ state: configured => show only table name (as requested) */
+          <>
+            <p className="mt-0.5 max-w-full truncate font-mono text-xs font-semibold text-white">
+              {d.table}
+            </p>
+          </>
+        )}
       </div>
     </div>
   );

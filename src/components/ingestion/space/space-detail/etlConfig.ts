@@ -3,6 +3,7 @@ import type { EtlActionType } from "@/components/ingestion/space/EtlActionIcon";
 
 export const ETL_ACTIONS: EtlActionType[] = [
   // ===== Common (Core) =====
+  "BOL",
   "aggregate",
   "conditional",
   "convert",
@@ -32,6 +33,10 @@ export const ETL_ACTIONS: EtlActionType[] = [
 ];
 
 export const ETL_GROUPS: { label: string; actions: EtlActionType[] }[] = [
+  {
+    label: "BOL AGENT",
+    actions: ["BOL"],
+  },
   {
     label: "TRANSFORM",
     actions: ["aggregate", "derived", "lookup", "conditional", "sort", "convert"],

@@ -33,6 +33,7 @@ import {
 
 export type EtlActionType =
   // ===== Common =====
+  | "BOL"
   | "aggregate"
   | "balanced"
   | "conditional"
@@ -80,6 +81,12 @@ const CONFIG: Record<
   }
 > = {
   // ===== Common =====
+  BOL: {
+    label: "BOL",
+    icon: <Database className="h-3.5 w-3.5" />,
+    wrapper: "bg-gray-50 text-gray-700 border border-gray-200",
+    dot: "bg-gray-400",
+  },
   aggregate: {
     label: "Aggregate",
     icon: <Sigma className="h-3.5 w-3.5" />,
